@@ -1,0 +1,6 @@
+{
+    "urls": [
+      ["dfplayer/dfplayer.py", "github:sebromero/micropython-dfplayer/src/dfplayer/dfplayer.py"]
+    ],    
+    "version": "1.0.0"
+}
