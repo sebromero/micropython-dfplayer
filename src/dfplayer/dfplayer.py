@@ -172,6 +172,10 @@ class DFPlayer:
                 raise RuntimeError("No such file or folder")
             raise RuntimeError("Unknown error")          
         
+    def reset(self):
+        """Reset the DFPlayer."""
+        self._send_command(DFPLAYER_CMD_RESET)
+        sleep_ms(DFPLAYER_BOOTUP_TIME_MS)
 
     def next_track(self):
         self._send_command(DFPLAYER_CMD_NEXT)
