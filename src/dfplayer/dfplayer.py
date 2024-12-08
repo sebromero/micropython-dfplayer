@@ -38,6 +38,7 @@ DFPLAYER_CMD_VOLUME_INC = const(0x04)  # Increase volume.
 DFPLAYER_CMD_VOLUME_DEC = const(0x05)  # Decrease volume.
 DFPLAYER_CMD_SET_VOLUME = const(0x06)  # Set the volume to the given level.
 DFPLAYER_CMD_SET_EQUALIZER = const(0x07)  # Set the equalizer to the given setting.
+DFPLAYER_CMD_SET_PLAYBACK_MODE = const(0x08)  # Set the playback mode.
 DFPLAYER_CMD_SET_SOURCE = const(0x09)  # Set the source to play files from.
 DFPLAYER_CMD_STANDBY_ENTER = const(0x0a)  # Enter low power mode.
 DFPLAYER_CMD_STANDBY_EXIT = const(0x0b)  # Exit low power mode, back to normal mode.
@@ -109,13 +110,40 @@ STATUS_PAUSED  = 0x0202
 # Flags to store info about the driver state
 DFPLAYER_FLAG_NO_ACK_BUG = const(0x01)  # The next command will be affected by the no-ACK bug.
 
+class PlayerStatus:
+    STOPPED = 1
+    PLAYING = 2
+    PAUSED = 3
+
+class EqualizerMode:
+    NORMAL = 0
+    POP = 1
+    ROCK = 2
+    JAZZ = 3
+    CLASSIC = 4
+    BASS = 5
+
+class PlaybackMode:
+    REPEAT = 0
+    FOLDER_REPEAT = 1
+    SINGLE_REPEAT = 2
+    RANDOM = 3
+
+class PlaybackSource:
+    USB = 0
+    SD_CARD = 1
+    AUX = 2
+    SLEEP = 3
+    FLASH = 4
+
 class DFPlayer:
     def __init__(self, uart, busy_pin = None):
         self.uart = uart
         uart.init(baudrate=DFPLAYER_BAUD, bits=DFPLAYER_DATA_BITS, parity=DFPLAYER_PARITY, stop=DFPLAYER_STOP_BITS)
         self.busy_pin = busy_pin
-        self.busy_pin.init(Pin.IN)
-        busy_pin.irq(trigger=Pin.IRQ_RISING | Pin.IRQ_FALLING, handler=self._on_busy_pin_change)
+        if busy_pin:
+            self.busy_pin.init(Pin.IN)
+            busy_pin.irq(trigger=Pin.IRQ_RISING | Pin.IRQ_FALLING, handler=self._on_busy_pin_change)
 
     def _on_busy_pin_change(self, pin):
          # High level during playback; Low in pause status and module sleep
@@ -126,15 +154,15 @@ class DFPlayer:
         """Return True if the DFPlayer is currently playing a song."""
         if self.busy_pin: # If we have a busy pin, use it
             return self._playing
-        return self.status == "Playing"
+        return self.status == PlayerStatus.PLAYING
 
     def _read_data(self):        
         if not self.uart.any():
-            return None
+            return None, None
         
         buf = self.uart.read(DFPLAYER_FRAME_SIZE)
         if buf is None or len(buf) != DFPLAYER_FRAME_SIZE:
-            return None        
+            return None, None        
         
         if buf[0] == DFPLAYER_START and buf[1] == DFPLAYER_VERSION and buf[2] == DFPLAYER_LEN and buf[9] == DFPLAYER_END:
             cmd = buf[3]
@@ -155,7 +183,18 @@ class DFPlayer:
         frame = [DFPLAYER_START, DFPLAYER_VERSION, DFPLAYER_LEN, command, DFPLAYER_ACK, data_high, data_low, high_byte, low_byte, DFPLAYER_END]        
         frame = bytes([b & 0xFF for b in frame]) # Convert to unsigned bytes
         self.uart.write(bytes(frame))
-        sleep_ms(DFPLAYER_SEND_DELAY_MS)
+        
+        # TODO extract into a method
+        # Give device some time to process the command
+        if command == DFPLAYER_CMD_SET_SOURCE: # set_media
+            sleep_ms(200)
+        elif command == DFPLAYER_CMD_RESET: # reset
+            sleep_ms(DFPLAYER_BOOTUP_TIME_MS)
+        elif command in [0x47,0x48,0x49,0x4E]:     # query files
+            sleep_ms(500)
+        else:
+            sleep_ms(DFPLAYER_SEND_DELAY_MS) # other commands
+        
         response_code, response_data = self._read_data()
 
         if response_code == DFPLAYER_RESPONSE_OK:
@@ -175,20 +214,55 @@ class DFPlayer:
     def reset(self):
         """Reset the DFPlayer."""
         self._send_command(DFPLAYER_CMD_RESET)
-        sleep_ms(DFPLAYER_BOOTUP_TIME_MS)
 
     def next_track(self):
         self._send_command(DFPLAYER_CMD_NEXT)
     
-    def set_volume(self, volume):
+    def previous_track(self):
+        self._send_command(DFPLAYER_CMD_PREV)
+
+    def play(self):
+        self._send_command(DFPLAYER_CMD_PLAY)
+
+    def pause(self):
+        self._send_command(DFPLAYER_CMD_PAUSE)
+
+    @property
+    def equalizer_settings(self):
+        """Return the current equalizer setting."""
+        self._send_command(DFPLAYER_CMD_GET_EQUALIZER)
+        response_code, response_data = self._read_data()
+        if response_code != DFPLAYER_CMD_GET_EQUALIZER:
+            raise RuntimeError("Invalid response received")
+        return response_data
+    
+    @equalizer_settings.setter
+    def equalizer_settings(self, value: EqualizerMode):
+        """Set the equalizer mode."""
+        if value < 0 or value > 5:
+            raise ValueError("Equalizer mode must be between 0 and 5")
+        self._send_command(DFPLAYER_CMD_SET_EQUALIZER, 0x00, value)
+
+    def increase_volume(self):
+        self._send_command(DFPLAYER_CMD_VOLUME_INC)
+
+    def decrease_volume(self):
+        self._send_command(DFPLAYER_CMD_VOLUME_DEC)
+    
+    @property
+    def volume(self):
+        pass
+
+    @volume.setter
+    def volume(self, value : int):
         """Set the volume of the DFPlayer in percent (0-100%)."""
-        if volume < 0 or volume > 100:
+        if value < 0 or value > 100:
             raise ValueError("Volume must be between 0 and 100")        
-        volume = int(volume / 100 * DFPLAYER_MAX_VOLUME) # Map to range 0 - 30
-        self._send_command(DFPLAYER_CMD_SET_VOLUME, 0x00, volume)
+        value = int(value / 100 * DFPLAYER_MAX_VOLUME) # Map to range 0 - 30
+        self._send_command(DFPLAYER_CMD_SET_VOLUME, 0x00, value)
 
     def play_from_mp3_folder(self, track_number):
-        """Play the given track number."""
+        """Play the given track number from the "MP3" folder."""
         if track_number < 0 or track_number > DFPLAYER_MAX_MP3_FILE:
             raise ValueError("Track number must be between 0 and 9999")
         self._send_command(DFPLAYER_CMD_PLAY_FROM_MP3, track_number & 0xFF, track_number >> 8)
@@ -201,28 +275,61 @@ class DFPlayer:
             raise ValueError("Track number must be between 0 and 9999")
         self._send_command(DFPLAYER_CMD_FILE, folder, track)
 
+    def set_playback_mode(self, mode: PlaybackMode):
+        """
+        Set the playback mode (0 - 3). 
+        0 = repeat, 1 = folder repeat, 2 = single repeat, 3 = random.
+        """
+        if mode < 0 or mode > 1:
+            raise ValueError("Playback mode must be 0 or 1")
+        self._send_command(DFPLAYER_CMD_SET_PLAYBACK_MODE, 0x00, mode)
+
+    def set_playback_source(self, source : PlaybackSource):
+        """
+        Set the playback source.
+        0 = U-disk, 1 = SD card, 2 = AUX, 3 = SLEEP, 4 = FLASH
+        """
+        if source < 0 or source > 4:
+            raise ValueError("Playback source must be between 0 and 4")
+        self._send_command(DFPLAYER_CMD_SET_SOURCE, 0x00, source)
+
+    def set_standby(self, enabled : bool):
+        """Enter or exit standby mode."""
+        if enabled:
+            self._send_command(DFPLAYER_CMD_STANDBY_ENTER)
+        else:
+            self._send_command(DFPLAYER_CMD_STANDBY_EXIT)
+
     @property
-    def status(self):
-        """Return the current status of the DFPlayer."""
+    def status(self) -> PlayerStatus:
+        """
+        Return the current status of the DFPlayer.
+        The possible return values are:
+        - PlayerStatus.STOPPED
+        - PlayerStatus.PLAYING
+        - PlayerStatus.PAUSED
+        """
         self._send_command(DFPLAYER_CMD_GET_STATUS)
         response_code, response_data = self._read_data()
         if response_code != DFPLAYER_CMD_GET_STATUS:
-            raise RuntimeError("Invalid response received")
+            raise RuntimeError(f"Invalid response code received {response_code}")
         
-        # Return status as string
         if response_data == STATUS_STOPPED:
-            return "Stopped"
+            return PlayerStatus.STOPPED
         if response_data == STATUS_PLAYING:
-            return "Playing"
+            return PlayerStatus.PLAYING
         if response_data == STATUS_PAUSED:
-            return "Paused"
+            return PlayerStatus.PAUSED
         
         return None
 
 if __name__ == "__main__":
     from machine import UART
     uart = UART(0, tx=Pin("TX"), rx=Pin("RX"))
-    busy_pin = Pin("D4")
-    player = DFPlayer(uart, busy_pin)
-    print(player.status)
-    player.set_volume(20)
+    player = DFPlayer(uart)
+    #busy_pin = Pin("D4")
+    #player = DFPlayer(uart, busy_pin)
+    #print(player.status)
+    player.volume = 20
+    #player.play() # Play the current / first track
+    #player.play_track(2, 1) # Play track 1 from folder 2
