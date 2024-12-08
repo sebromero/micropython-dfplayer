@@ -186,7 +186,9 @@ class DFPlayer:
         
         # TODO extract into a method
         # Give device some time to process the command
-        if command == DFPLAYER_CMD_SET_SOURCE: # set_media
+        # TODO: Added DFPLAYER_CMD_SET_VOLUME. Check if only set volume needs more time or all commands
+        # so we could bump DFPLAYER_SEND_DELAY_MS to 200ms
+        if command in [DFPLAYER_CMD_SET_SOURCE, DFPLAYER_CMD_SET_VOLUME]: # set_media
             sleep_ms(200)
         elif command == DFPLAYER_CMD_RESET: # reset
             sleep_ms(DFPLAYER_BOOTUP_TIME_MS)
