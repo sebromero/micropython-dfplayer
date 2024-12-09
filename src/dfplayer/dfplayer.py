@@ -154,7 +154,9 @@ class DFPlayer:
             return self._playing
         return self.status == PlayerStatus.PLAYING
 
-    def _read_data(self):        
+    def _read_data(self):
+        self.uart.flush() # Clear the buffer
+
         if not self.uart.any():
             return None, None
         
