@@ -7,7 +7,10 @@ import struct
 
 # Macros
 DFPLAYER_BOOTUP_TIME_MS = const(3000)  # Boot up of the device takes 1.5 to 3 secs.
-DFPLAYER_TIMEOUT_MS = const(100)  # Timeout waiting for a replay in milliseconds.
+
+# TODO Depends on devie. Make it configurable.
+# DFPLAYER_TIMEOUT_MS = const(100)  # Timeout waiting for a replay in milliseconds.
+DFPLAYER_TIMEOUT_MS = const(350)  # Timeout waiting for a replay in milliseconds.
 DFPLAYER_SEND_DELAY_MS = const(100)  # Wait 100ms after a cmd to work around hw bug.
 DFPLAYER_RETRIES = const(5)  # How often to retry a command on timeout.
 DFPLAYER_MAX_VOLUME = const(30)  # Maximum supported volume.
