@@ -8,10 +8,10 @@ import struct
 # Macros
 DFPLAYER_BOOTUP_TIME_MS = const(3000)  # Boot up of the device takes 1.5 to 3 secs.
 
-# TODO Depends on devie. Make it configurable.
-# DFPLAYER_TIMEOUT_MS = const(100)  # Timeout waiting for a replay in milliseconds.
-DFPLAYER_TIMEOUT_MS = const(350)  # Timeout waiting for a replay in milliseconds.
-DFPLAYER_SEND_DELAY_MS = const(100)  # Wait 100ms after a cmd to work around hw bug.
+DFPLAYER_TIMEOUT_MS = const(100)  # Timeout waiting for a replay in milliseconds.
+# TODO Depends on device. Make it configurable.
+# DFPLAYER_SEND_DELAY_MS = const(100)  # Wait 100ms after a cmd to work around hw bug.
+DFPLAYER_SEND_DELAY_MS = const(350)  # Wait 100ms after a cmd to work around hw bug.
 DFPLAYER_RETRIES = const(5)  # How often to retry a command on timeout.
 DFPLAYER_MAX_VOLUME = const(30)  # Maximum supported volume.
 DFPLAYER_MAX_FOLDER = const(99)  # Highest supported folder number.
@@ -101,9 +101,9 @@ DFPLAYER_DEVICE_USB = const(0x01)  # A USB storage device was inserted/ejected.
 DFPLAYER_DEVICE_SDCARD = const(0x02)  # An SD card was inserted/ejected.
 
 # Status bitmasks
-DFPLAYER_STATUS_STOPPED = 0x00
-DFPLAYER_STATUS_PLAYING = 0x01 # The DFPlayer is currently playing a song.
-DFPLAYER_STATUS_PAUSED  = 0x02 # The DFPlayer is paused.
+DFPLAYER_STATUS_STOPPED = const(0x00) # The DFPlayer is currently stopped e.g. done playing a song.
+DFPLAYER_STATUS_PLAYING = const(0x01) # The DFPlayer is currently playing a song.
+DFPLAYER_STATUS_PAUSED  = const(0x02) # The DFPlayer is paused.
 
 # Flags to store info about the driver state
 DFPLAYER_FLAG_NO_ACK_BUG = const(0x01)  # The next command will be affected by the no-ACK bug.
@@ -137,7 +137,7 @@ class PlaybackSource:
 class DFPlayer:
     def __init__(self, uart, busy_pin = None):
         self.uart = uart
-        uart.init(baudrate=DFPLAYER_BAUD, bits=DFPLAYER_DATA_BITS, parity=DFPLAYER_PARITY, stop=DFPLAYER_STOP_BITS)
+        uart.init(baudrate=DFPLAYER_BAUD, bits=DFPLAYER_DATA_BITS, parity=DFPLAYER_PARITY, stop=DFPLAYER_STOP_BITS, timeout=DFPLAYER_TIMEOUT_MS)
         self.busy_pin = busy_pin
         if busy_pin:
             self.busy_pin.init(Pin.IN)
@@ -186,9 +186,7 @@ class DFPlayer:
         
         # TODO extract into a method
         # Give device some time to process the command
-        # TODO: Added DFPLAYER_CMD_SET_VOLUME. Check if only set volume needs more time or all commands
-        # so we could bump DFPLAYER_SEND_DELAY_MS to 200ms
-        if command in [DFPLAYER_CMD_SET_SOURCE, DFPLAYER_CMD_SET_VOLUME]: # set_media
+        if command == DFPLAYER_CMD_SET_SOURCE: # set_media
             sleep_ms(200)
         elif command == DFPLAYER_CMD_RESET: # reset
             sleep_ms(DFPLAYER_BOOTUP_TIME_MS)
@@ -230,16 +228,16 @@ class DFPlayer:
         self._send_command(DFPLAYER_CMD_PAUSE)
 
     @property
-    def equalizer_settings(self):
+    def equalizer_mode(self):
         """Return the current equalizer setting."""
         self._send_command(DFPLAYER_CMD_GET_EQUALIZER)
         response_code, response_data = self._read_data()
         if response_code != DFPLAYER_CMD_GET_EQUALIZER:
-            raise RuntimeError("Invalid response received")
+            raise RuntimeError(f"Invalid response code received {response_code}")
         return response_data
     
-    @equalizer_settings.setter
-    def equalizer_settings(self, value: EqualizerMode):
+    @equalizer_mode.setter
+    def equalizer_mode(self, value: EqualizerMode):
         """Set the equalizer mode."""
         if value < 0 or value > 5:
             raise ValueError("Equalizer mode must be between 0 and 5")
@@ -253,7 +251,11 @@ class DFPlayer:
     
     @property
     def volume(self):
-        pass
+        self._send_command(DFPLAYER_CMD_GET_VOLUME)
+        response_code, response_data = self._read_data()
+        if response_code != DFPLAYER_CMD_GET_VOLUME:
+            raise RuntimeError(f"Invalid response code received {response_code}")
+        return int(response_data / DFPLAYER_MAX_VOLUME * 100)
 
     @volume.setter
     def volume(self, value : int):
