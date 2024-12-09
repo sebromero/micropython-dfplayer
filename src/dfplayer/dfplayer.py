@@ -98,22 +98,17 @@ DFPLAYER_DEVICE_USB = const(0x01)  # A USB storage device was inserted/ejected.
 DFPLAYER_DEVICE_SDCARD = const(0x02)  # An SD card was inserted/ejected.
 
 # Status bitmasks
-# These values have been obtained by reverse engineering.
-#DFPLAYER_STATUS_PLAYING = const(0x01)  # The DFPlayer is currently playing a song.
-#DFPLAYER_STATUS_PAUSE = const(0x02)  # The DFPlayer is paused.
-# TODO decide if we want to use these values or the bitmasks
-STATUS_STOPPED = 0x0200
-STATUS_PLAYING = 0x0201
-STATUS_PAUSED  = 0x0202
-
+DFPLAYER_STATUS_STOPPED = 0x00
+DFPLAYER_STATUS_PLAYING = 0x01 # The DFPlayer is currently playing a song.
+DFPLAYER_STATUS_PAUSED  = 0x02 # The DFPlayer is paused.
 
 # Flags to store info about the driver state
 DFPLAYER_FLAG_NO_ACK_BUG = const(0x01)  # The next command will be affected by the no-ACK bug.
 
 class PlayerStatus:
-    STOPPED = 1
-    PLAYING = 2
-    PAUSED = 3
+    STOPPED = 0
+    PLAYING = 1
+    PAUSED = 2
 
 class EqualizerMode:
     NORMAL = 0
@@ -316,11 +311,11 @@ class DFPlayer:
         if response_code != DFPLAYER_CMD_GET_STATUS:
             raise RuntimeError(f"Invalid response code received {response_code}")
         
-        if response_data == STATUS_STOPPED:
+        if response_data == DFPLAYER_STATUS_STOPPED:
             return PlayerStatus.STOPPED
-        if response_data == STATUS_PLAYING:
+        if response_data == DFPLAYER_STATUS_PLAYING:
             return PlayerStatus.PLAYING
-        if response_data == STATUS_PAUSED:
+        if response_data == DFPLAYER_STATUS_PAUSED:
             return PlayerStatus.PAUSED
         
         return None
