@@ -227,6 +227,14 @@ class DFPlayer:
     def pause(self):
         self._send_command(DFPLAYER_CMD_PAUSE)
 
+    def stop(self):
+        self._send_command(0x16)
+
+    def set_muted(self, muted : bool):
+        """Mute or unmute the DFPlayer."""
+        value = 0x01 if muted else 0x00
+        self._send_command(0x1a, 0x00, value)
+
     @property
     def equalizer_mode(self):
         """Return the current equalizer setting."""
