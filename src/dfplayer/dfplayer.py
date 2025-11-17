@@ -287,6 +287,12 @@ class DFPlayer:
             raise ValueError("Track number must be between 0 and 9999")
         self._send_command(DFPLAYER_CMD_FILE, folder, track)
 
+    def play_track_by_number(self, track_number):
+        """Play the given track number from the current folder 0-2999"""
+        if track_number < 0 or track_number > 2999:
+            raise ValueError("Track number must be between 0 and 2999")            
+        self._send_command(0x03, 0x00, track_number)
+
     def set_playback_mode(self, mode: PlaybackMode):
         """
         Set the playback mode (0 - 3). 
