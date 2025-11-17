@@ -187,20 +187,23 @@ class DFPlayer:
         # TODO extract into a method
         # Give device some time to process the command
         if command == DFPLAYER_CMD_SET_SOURCE: # set_media
-            sleep_ms(200)
+            sleep_ms(200) # According to the datasheet, this command takes 200ms
         elif command == DFPLAYER_CMD_RESET: # reset
+            print("Sleeping for", DFPLAYER_BOOTUP_TIME_MS)
             sleep_ms(DFPLAYER_BOOTUP_TIME_MS)
         elif command in [0x47,0x48,0x49,0x4E]:     # query files
             sleep_ms(500)
         else:
+            print("Sleeping for", DFPLAYER_SEND_DELAY_MS)
             sleep_ms(DFPLAYER_SEND_DELAY_MS) # other commands
         
         response_code, response_data = self._read_data()
 
         if response_code == DFPLAYER_RESPONSE_OK:
+            print(f"Command {hex(command)} executed successfully {hex(response_code)}, {hex(response_data)}")
             return True
         
-        if response_code == DFPLAYER_RESPONSE_ERROR:
+        elif response_code == DFPLAYER_RESPONSE_ERROR:
             if response_data == DFPLAYER_ERROR_BUSY:
                 raise RuntimeError("DFPlayer is busy")
             if response_data == DFPLAYER_ERROR_FRAME:
