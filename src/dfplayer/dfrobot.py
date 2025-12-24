@@ -6,7 +6,6 @@ DFPLAYER_SEND_DELAY_MS = const(100)  # Wait 100ms after a cmd to work around hw 
 DFPLAYER_CMD_SET_PLAYBACK_MODE = const(0x08)  # Set the playback mode. (0-3)
 DFPLAYER_CMD_STANDBY_EXIT = const(0x0b)  # Exit low power mode, back to normal mode.
 DFPLAYER_CMD_VOLUME_ADJUST_SET = const(0x10) # TODO
-DFPLAYER_CMD_INITIALIZATION = const(0x3f)  # TODO e.g. get online devices
 
 DFPLAYER_CMD_FILES_SDCARD = const(0x47)  # Get the total number of files on the SD card.
 DFPLAYER_CMD_FILES_USB = const(0x48)  # Get the total number of files on USB storage.

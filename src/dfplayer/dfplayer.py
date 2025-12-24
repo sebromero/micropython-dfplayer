@@ -71,6 +71,7 @@ DFPLAYER_CMD_GET_MODE = const(0x45)  # Retrieve the current playback mode.
 DFPLAYER_CMD_GET_VERSION = const(0x46)  # Retrieve the device's software version.
 DFPLAYER_CMD_FILES_FLASH = const(0x49)  # Get the total number of files on the internal flash.
 DFPLAYER_CMD_FILENO_FLASH = const(0x4d)  # Get the currently select file number on the NOR flash.
+DFPLAYER_CMD_INIT = const(0x3f)  # TODO e.g. get online devices
 
 class Frame():
     def __init__(self, raw_data):
@@ -90,9 +91,12 @@ class Frame():
 class FrameReader():
     def __init__(self, uart):
         self.uart = uart
-        self._frames = deque([], 5)
+        self._frames = deque([], 10)  # Store up to 10 frames
+        # TODO: Consider using IRQ on uart RX
+        # On ESP32 it uses Timer(0) which makes it unavailable for other uses
+        #uart.irq(handler= lambda e: print("UART IRQ fired!"), trigger=UART.IRQ_RXIDLE)
 
-    def clear_rx_buffer(self):
+    def _clear_rx_buffer(self):
         avail_bytes = self.uart.any()
         self.uart.read(avail_bytes)
 
@@ -110,6 +114,11 @@ class FrameReader():
         if len(self._frames) == 0:
             return None
         return self._frames.popleft()
+    
+    def peek_frame(self) -> Frame | None:
+        if len(self._frames) == 0:
+            return None
+        return self._frames[0]
 
     def _read_frame(self):
         if not self.uart.any():
@@ -117,7 +126,7 @@ class FrameReader():
     
         if self.uart.any() % DFPLAYER_FRAME_SIZE != 0:
             print("Warning: Incomplete frame in UART buffer, clearing buffer")
-            self.clear_rx_buffer()
+            self._clear_rx_buffer()
             return None
         
         return Frame(self.uart.read(DFPLAYER_FRAME_SIZE))
@@ -144,8 +153,6 @@ class DFPlayer:
             self.busy_pin.init(Pin.IN)
             busy_pin.irq(trigger=Pin.IRQ_RISING | Pin.IRQ_FALLING, handler=self._on_busy_pin_change)
         
-        # TODO: Consider using IRQ on uart RX
-        # uart.irq(handler= lambda e: print("UART IRQ fired!"), trigger=UART.IRQ_RXIDLE)
         self._frame_reader = FrameReader(uart)
 
     def _on_busy_pin_change(self, pin):
@@ -220,8 +227,13 @@ class DFPlayer:
         self._exec_command(DFPLAYER_CMD_RESET, ack=False, delay_ms=DFPLAYER_BOOTUP_TIME_MS)
         spurious_data = self.uart.any() % DFPLAYER_FRAME_SIZE
         if spurious_data > 0:
-            print(f"Clearing {spurious_data} bytes of spurious data from UART buffer after reset")
+            # print(f"Clearing {spurious_data} bytes of spurious data from UART buffer after reset")
             self.uart.read(spurious_data)
+        self._frame_reader.update()
+        last_frame = self._frame_reader.peek_frame()
+        if last_frame and last_frame.command == DFPLAYER_CMD_INIT:
+            # print("Removing bootup OK response from frame reader")
+            self._frame_reader.pop_frame()  # Remove the bootup OK response
 
     def next_track(self):
         self._exec_command(DFPLAYER_CMD_NEXT)
