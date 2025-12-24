@@ -73,12 +73,20 @@ DFPLAYER_CMD_FILES_FLASH = const(0x49)  # Get the total number of files on the i
 DFPLAYER_CMD_FILENO_FLASH = const(0x4d)  # Get the currently select file number on the NOR flash.
 
 class Frame():
-    def __init__(self, data):
-        self.data = data
+    def __init__(self, raw_data):
+        if raw_data is None or len(raw_data) != DFPLAYER_FRAME_SIZE:
+            raise ValueError(f"Frame data must be exactly {DFPLAYER_FRAME_SIZE} bytes")
+        
+        if raw_data[0] == DFPLAYER_START and raw_data[1] == DFPLAYER_VERSION and raw_data[2] == DFPLAYER_LEN and raw_data[9] == DFPLAYER_END:
+            self.command = raw_data[3]
+            self.data = struct.unpack('>H', raw_data[5:7])[0]
+            self.raw_data = raw_data
+        else:
+            raise ValueError("Invalid frame received:", self._frame_as_string(raw_data))
 
     def __str__(self):
-        return " ".join([hex(b) for b in self.data])
-
+        return " ".join([hex(b) for b in self.raw_data])
+    
 class PlayerStatus:
     STOPPED = 0
     PLAYING = 1
@@ -124,30 +132,20 @@ class DFPlayer:
 
     def _read_frame(self):
         if not self.uart.any():
-            return None, None
+            return None
     
         if self.uart.any() % DFPLAYER_FRAME_SIZE != 0:
             print("Warning: Incomplete frame in UART buffer, clearing buffer")
             self._clear_rx_buffer()
-            return None, None
+            return None
         
-        buf = self.uart.read(DFPLAYER_FRAME_SIZE)
-        if buf is None or len(buf) != DFPLAYER_FRAME_SIZE:
-            return None, None        
-        
-        if buf[0] == DFPLAYER_START and buf[1] == DFPLAYER_VERSION and buf[2] == DFPLAYER_LEN and buf[9] == DFPLAYER_END:
-            cmd = buf[3]
-            data = struct.unpack('>H', buf[5:7])[0]
-            return (cmd, data)
-        
-        print("Invalid frame received:", self._frame_as_string(buf))
-        return None, None
+        return Frame(self.uart.read(DFPLAYER_FRAME_SIZE))
 
     def _read_frames(self):
         frames = deque([], 5)
         while True:
             f = self._read_frame()
-            if f == (None, None):
+            if f is None:
                 return frames
             frames.append(f)
 
@@ -155,6 +153,8 @@ class DFPlayer:
         # Ensure command is only one byte long
         if command > 0xFF:
             raise ValueError("Command must be a single byte")
+        if data_high > 0xFF or data_low > 0xFF:
+            raise ValueError("Data high and low must be single byte values")
         frame_check_init = -(DFPLAYER_VERSION + DFPLAYER_LEN)
         ack_flag = DFPLAYER_ACK if ack else DFPLAYER_NO_ACK
         checksum = frame_check_init - (command + ack_flag + data_low + data_high)
@@ -177,28 +177,28 @@ class DFPlayer:
         # then the ACK/ERROR response.
         if is_query:
             cmd_response = self._read_frame()
-            if cmd_response[0] != command:
-                raise RuntimeError(f"Invalid response code received: {hex(cmd_response[0])} expected: {hex(command)}")
+            if cmd_response.command != command:
+                raise RuntimeError(f"Invalid response code received: {hex(cmd_response.command)} expected: {hex(command)}")
 
         if ack:    
-            ack_response_code, ack_response_data = self._read_frame()
-            if ack_response_code != DFPLAYER_RESPONSE_OK:
-                raise RuntimeError(f"Command {hex(command)} was not acknowledged. Received: {hex(ack_response_code)} data: {hex(ack_response_data)}")
+            ack_response = self._read_frame()
+            if ack_response.command != DFPLAYER_RESPONSE_OK:
+                raise RuntimeError(f"Command {hex(command)} was not acknowledged. Received: {hex(ack_response.command)} data: {hex(ack_response.data)}")
 
         if not check_error:
             return cmd_response
 
         sleep_ms(25)  # Give some time before reading the error response
-        error_response_code, error_response_data = self._read_frame()
+        error_response = self._read_frame()
         
         # TODO: DEBUG, remove later
-        if error_response_code is not None:
-            print(f"Error response: {hex(error_response_code)} data: {hex(error_response_data)}")
+        if error_response is not None:
+            print(f"Error response: {hex(error_response.command)} data: {hex(error_response.data)}")
         else:
             print("No error response received")
 
-        if error_response_code == DFPLAYER_RESPONSE_ERROR:
-            self._handle_error_response(error_response_data)
+        if error_response and error_response.command == DFPLAYER_RESPONSE_ERROR:
+            self._handle_error_response(error_response.data)
 
         return cmd_response
 
@@ -225,7 +225,7 @@ class DFPlayer:
     @property
     def equalizer_mode(self):
         """Return the current equalizer setting."""
-        _, response_data = self._exec_command(DFPLAYER_CMD_GET_EQUALIZER, is_query=True)
+        response_data = self._exec_command(DFPLAYER_CMD_GET_EQUALIZER, is_query=True).data
         if response_data == 0:
             return EqualizerMode.NORMAL
         if response_data == 1:
@@ -255,7 +255,7 @@ class DFPlayer:
     
     @property
     def volume(self):
-        _, response_data = self._exec_command(DFPLAYER_CMD_GET_VOLUME, is_query=True)
+        response_data = self._exec_command(DFPLAYER_CMD_GET_VOLUME, is_query=True).data
         return int(response_data / DFPLAYER_MAX_VOLUME * 100)
 
     @volume.setter
