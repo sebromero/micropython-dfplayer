@@ -7,13 +7,14 @@ import struct
 from collections import deque
 
 # CONFIG
-DFPLAYER_DEFAULT_DELAY_MS = const(150)
+DFPLAYER_DEFAULT_DELAY_MS = const(150) # Default delay after sending a command.
 DFPLAYER_BOOTUP_TIME_MS = const(3000)  # Boot up of the device takes 1.5 to 3 secs.
 DFPLAYER_TIMEOUT_MS = const(100)  # Default timeout waiting for a reply in milliseconds.
 
 DFPLAYER_MAX_VOLUME = const(30)  # Maximum supported volume.
 DFPLAYER_MAX_FOLDER = const(99)  # Highest supported folder number.
 DFPLAYER_MAX_MP3_FILE = const(255)  # Highest supported file number in the "MP3" folder.
+DFPLAYER_MAX_ADVERT_FILE = const(65536)  # Highest supported file number in the "ADVERT" folder.
 
 # Constants used in frames sent to the DFPlayer Mini
 DFPLAYER_FRAME_SIZE = const(10)  # Size of a frame sent to the DFPlayer Mini.
@@ -55,17 +56,20 @@ DFPLAYER_ERROR_NO_SUCH_FILE = const(0x06)  # File/folder selected for playback (
 # Common Commands
 DFPLAYER_CMD_NEXT = const(0x01)  # Start playing the next song.
 DFPLAYER_CMD_PREV = const(0x02)  # Start playing the next song.
-# DFPLAYER_CMD_PLAY_TRACK = const(0x03)  # Play the given track. (DFROBOT: 0-2999) (MH2024/GD3200: 0-65535)
+DFPLAYER_CMD_PLAY_TRACK = const(0x03)  # Play the given track. (DFROBOT: 0-2999) (MH2024/GD3200: 0-65535)
 DFPLAYER_CMD_VOLUME_INC = const(0x04)  # Increase volume.
 DFPLAYER_CMD_VOLUME_DEC = const(0x05)  # Decrease volume.
 DFPLAYER_CMD_SET_VOLUME = const(0x06)  # Set the volume to the given level. (0-30)
 DFPLAYER_CMD_SET_EQUALIZER = const(0x07)  # Set the equalizer to the given setting. (0-5)
-# DFPLAYER_CMD_SET_SOURCE = const(0x09)  # Set the source to play files from.
+DFPLAYER_CMD_SET_SOURCE = const(0x09)  # Set the source to play files from.
 DFPLAYER_CMD_STANDBY_ENTER = const(0x0a)  # Enter low power mode.
 DFPLAYER_CMD_RESET = const(0x0c)  # Reset the DFPlayer Mini.
 DFPLAYER_CMD_PLAY = const(0x0d)  # Start playing the selected file.
 DFPLAYER_CMD_PAUSE = const(0x0e)  # Pause the playback.
+DFPLAYER_CMD_STOP = const(0x16)  # Stop playback.
+DFPLAYER_CMD_MUTE = const(0x1a)  # Mute/unmute the audio output. 0=unmute, 1=mute
 DFPLAYER_CMD_FILE = const(0x0f)  # Play the given file (1-255) in the given folder (1-99)
+DFPLAYER_CMD_PLAY_ADVERT = const(0x13)  # Play the given file (1-9999) from the folder "ADVERT", resume current playback afterwards.
 # DFPLAYER_CMD_REPEAT_PLAYBACK = const(0x11)  # Start/stop repeat-playing the whole source. 1=loop 0=stop
 DFPLAYER_CMD_GET_STATUS = const(0x42)  # Retrieve the current status.
 DFPLAYER_CMD_GET_VOLUME = const(0x43)  # Retrieve the current volume.
@@ -104,6 +108,7 @@ class FrameReader():
         self.uart.read(avail_bytes)
 
     def update(self):
+        # TODO: Filter out System Responses
         while True:
             f = self._read_frame()
             if f is None:
@@ -252,6 +257,14 @@ class DFPlayer:
     def pause(self):
         self._exec_command(DFPLAYER_CMD_PAUSE)
 
+    def stop(self):
+        self._exec_command(DFPLAYER_CMD_STOP)
+
+    def set_muted(self, muted : bool):
+        """Mute or unmute the DFPlayer."""
+        value = 0x01 if muted else 0x00
+        self._exec_command(DFPLAYER_CMD_MUTE, 0x00, value)
+
     @property
     def equalizer_mode(self):
         """Return the current equalizer setting."""
@@ -304,6 +317,16 @@ class DFPlayer:
             raise ValueError("Track number must be between 0 and 255")
         self._exec_command(DFPLAYER_CMD_FILE, folder, track, check_error=True)
 
+    def play_track_by_number(self, track_number):
+        """Play the given track number from the flattened file list."""
+        self._exec_command(DFPLAYER_CMD_PLAY_TRACK, track_number >> 8, track_number & 0xFF)
+
+    def play_from_advert_folder(self, track_number):
+        """Play the given track number from the "ADVERT" folder."""
+        if track_number < 0 or track_number > DFPLAYER_MAX_ADVERT_FILE:
+            raise ValueError("Track number must be between 0 and 9999")
+        self._send_command(DFPLAYER_CMD_PLAY_ADVERT, track_number >> 8, track_number & 0xFF)
+
     def enter_standby(self):
         """Enter or exit standby mode."""
         self._send_command(DFPLAYER_CMD_STANDBY_ENTER)
@@ -317,7 +340,7 @@ class DFPlayer:
         - PlayerStatus.PLAYING
         - PlayerStatus.PAUSED
         """
-        _, response_data = self._exec_command(DFPLAYER_CMD_GET_STATUS, is_query=True)
+        response_data = self._exec_command(DFPLAYER_CMD_GET_STATUS, is_query=True).data
         
         if response_data == DFPLAYER_STATUS_STOPPED:
             return PlayerStatus.STOPPED
