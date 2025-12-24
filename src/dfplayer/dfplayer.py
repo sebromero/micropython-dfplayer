@@ -72,6 +72,12 @@ DFPLAYER_CMD_GET_VERSION = const(0x46)  # Retrieve the device's software version
 DFPLAYER_CMD_FILES_FLASH = const(0x49)  # Get the total number of files on the internal flash.
 DFPLAYER_CMD_FILENO_FLASH = const(0x4d)  # Get the currently select file number on the NOR flash.
 
+class Frame():
+    def __init__(self, data):
+        self.data = data
+
+    def __str__(self):
+        return " ".join([hex(b) for b in self.data])
 
 class PlayerStatus:
     STOPPED = 0
@@ -112,8 +118,17 @@ class DFPlayer:
     def _frame_as_string(self, frame):
         return " ".join([hex(b) for b in frame])
 
+    def _clear_rx_buffer(self):
+        while self.uart.any():
+            self.uart.read()
+
     def _read_frame(self):
         if not self.uart.any():
+            return None, None
+    
+        if self.uart.any() % DFPLAYER_FRAME_SIZE != 0:
+            print("Warning: Incomplete frame in UART buffer, clearing buffer")
+            self._clear_rx_buffer()
             return None, None
         
         buf = self.uart.read(DFPLAYER_FRAME_SIZE)
@@ -152,7 +167,7 @@ class DFPlayer:
     def _handle_error_response(self, response_data):
         raise RuntimeError(f"Unknown error. Data: {hex(response_data)}")          
 
-    def _exec_command(self, command, data_high = 0x0, data_low = 0x0, delay_ms = DFPLAYER_DEFAULT_DELAY_MS, ack = True, is_query = False):
+    def _exec_command(self, command, data_high = 0x0, data_low = 0x0, delay_ms = DFPLAYER_DEFAULT_DELAY_MS, ack = True, is_query = False, check_error = False):
         self._send_command(command, data_high, data_low, ack)
         sleep_ms(delay_ms)
 
@@ -170,7 +185,10 @@ class DFPlayer:
             if ack_response_code != DFPLAYER_RESPONSE_OK:
                 raise RuntimeError(f"Command {hex(command)} was not acknowledged. Received: {hex(ack_response_code)} data: {hex(ack_response_data)}")
 
-        sleep_ms(10)  # Give some time before reading the error response
+        if not check_error:
+            return cmd_response
+
+        sleep_ms(25)  # Give some time before reading the error response
         error_response_code, error_response_data = self._read_frame()
         
         # TODO: DEBUG, remove later
@@ -187,6 +205,10 @@ class DFPlayer:
     def reset(self):
         """Reset the DFPlayer."""
         self._exec_command(DFPLAYER_CMD_RESET, ack=False, delay_ms=DFPLAYER_BOOTUP_TIME_MS)
+        spurious_data = self.uart.any() % DFPLAYER_FRAME_SIZE
+        if spurious_data > 0:
+            print(f"Clearing {spurious_data} bytes of spurious data from UART buffer after reset")
+            self.uart.read(spurious_data)
 
     def next_track(self):
         self._exec_command(DFPLAYER_CMD_NEXT)
@@ -250,7 +272,7 @@ class DFPlayer:
             raise ValueError("Folder number must be between 0 and 99")
         if track < 0 or track > DFPLAYER_MAX_MP3_FILE:
             raise ValueError("Track number must be between 0 and 255")
-        self._exec_command(DFPLAYER_CMD_FILE, folder, track)
+        self._exec_command(DFPLAYER_CMD_FILE, folder, track, check_error=True)
 
     def enter_standby(self):
         """Enter or exit standby mode."""
@@ -279,8 +301,10 @@ class DFPlayer:
 if __name__ == "__main__":
     from machine import UART
     from time import sleep_ms
-    uart = UART(0, tx=Pin("TX"), rx=Pin("RX"))
-    player = DFPlayer(uart)
+    uart1 = UART(0, tx=Pin("TX"), rx=Pin("RX"))
+    uart2 = UART(1, tx=Pin("D9"), rx=Pin("D8"))
+    player1 = DFPlayer(uart1)
+    player2 = DFPlayer(uart2)
     # player.reset()
     #busy_pin = Pin("D4")
     #player = DFPlayer(uart, busy_pin)
