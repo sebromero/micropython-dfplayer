@@ -18,7 +18,6 @@ DFPLAYER_CMD_FILENO_FLASH = const(0x4d)  # Get the currently select file number 
 DFPLAYER_ERROR_BUSY = const(0x00)  # Module is busy.
 DFPLAYER_ERROR_FRAME = const(0x01)  # Received incomplete frame.
 DFPLAYER_ERROR_FCS = const(0x02)  # Frame check sequence of last frame didn't match.
-DFPLAYER_ERROR_NO_SUCH_FILE = const(0x06)  # File/folder selected for playback (command 0x06) does not exist.
 
 class PlaybackSource:
     USB = 0

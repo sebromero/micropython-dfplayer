@@ -49,6 +49,9 @@ DFPLAYER_STATUS_PAUSED  = const(0x02) # The DFPlayer is paused.
 DFPLAYER_RESPONSE_ERROR = const(0x40)  # While processing the most recent command an error occurred.
 DFPLAYER_RESPONSE_OK = const(0x41)  # Last command succeeded.
 
+# Error codes sent as parameter of error messages
+DFPLAYER_ERROR_NO_SUCH_FILE = const(0x06)  # File/folder selected for playback (command 0x06) does not exist.
+
 # Common Commands
 DFPLAYER_CMD_NEXT = const(0x01)  # Start playing the next song.
 DFPLAYER_CMD_PREV = const(0x02)  # Start playing the next song.
@@ -182,6 +185,8 @@ class DFPlayer:
         self.uart.flush() # Wait until all data is sent        
 
     def _handle_error_response(self, response_data):
+        if response_data == DFPLAYER_ERROR_NO_SUCH_FILE:
+            raise RuntimeError("No such file or folder")
         raise RuntimeError(f"Unknown error. Data: {hex(response_data)}")          
 
     def _exec_command(self, command, data_high = 0x0, data_low = 0x0, delay_ms = DFPLAYER_DEFAULT_DELAY_MS, ack = True, is_query = False, check_error = False):

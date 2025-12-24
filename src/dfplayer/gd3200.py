@@ -2,7 +2,7 @@ from micropython import const
 from .dfplayer import DFPlayer, DFPLAYER_CMD_PLAY_TRACK, DFPLAYER_CMD_SET_SOURCE
 
 # TODO Depends on device. test
-DFPLAYER_SEND_DELAY_MS = const(350)  # Wait 350ms after a cmd to work around hw bug.
+# DFPLAYER_SEND_DELAY_MS = const(350)  # Wait 350ms after a cmd to work around hw bug.
 DFPLAYER_SINGLE_TRACK_LOOP = const(0x08)  # Loops single track (0-65535)
 DFPLAYER_CMD_FILE_LARGE = const(0x14)  # Play the given file (1-4095) in the given folder (1-15).
 DFPLAYER_CMD_STOP = const(0x16)  # Stop playback.
