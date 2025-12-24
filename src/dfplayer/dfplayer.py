@@ -9,7 +9,7 @@ from collections import deque
 # CONFIG
 DFPLAYER_DEFAULT_DELAY_MS = const(150)
 DFPLAYER_BOOTUP_TIME_MS = const(3000)  # Boot up of the device takes 1.5 to 3 secs.
-DFPLAYER_TIMEOUT_MS = const(100)  # Timeout waiting for a reply in milliseconds.
+DFPLAYER_TIMEOUT_MS = const(100)  # Default timeout waiting for a reply in milliseconds.
 
 DFPLAYER_MAX_VOLUME = const(30)  # Maximum supported volume.
 DFPLAYER_MAX_FOLDER = const(99)  # Highest supported folder number.
@@ -87,6 +87,41 @@ class Frame():
     def __str__(self):
         return " ".join([hex(b) for b in self.raw_data])
     
+class FrameReader():
+    def __init__(self, uart):
+        self.uart = uart
+        self._frames = deque([], 5)
+
+    def clear_rx_buffer(self):
+        avail_bytes = self.uart.any()
+        self.uart.read(avail_bytes)
+
+    def update(self):
+        while True:
+            f = self._read_frame()
+            if f is None:
+                return
+            self._frames.append(f)
+
+    def available_frames(self):
+        return len(self._frames)
+    
+    def pop_frame(self) -> Frame | None:
+        if len(self._frames) == 0:
+            return None
+        return self._frames.popleft()
+
+    def _read_frame(self):
+        if not self.uart.any():
+            return None
+    
+        if self.uart.any() % DFPLAYER_FRAME_SIZE != 0:
+            print("Warning: Incomplete frame in UART buffer, clearing buffer")
+            self.clear_rx_buffer()
+            return None
+        
+        return Frame(self.uart.read(DFPLAYER_FRAME_SIZE))
+
 class PlayerStatus:
     STOPPED = 0
     PLAYING = 1
@@ -111,6 +146,7 @@ class DFPlayer:
         
         # TODO: Consider using IRQ on uart RX
         # uart.irq(handler= lambda e: print("UART IRQ fired!"), trigger=UART.IRQ_RXIDLE)
+        self._frame_reader = FrameReader(uart)
 
     def _on_busy_pin_change(self, pin):
          # High level during playback; Low in pause status and module sleep
@@ -122,32 +158,6 @@ class DFPlayer:
         if self.busy_pin: # If we have a busy pin, use it
             return self._playing
         return self.status == PlayerStatus.PLAYING
-
-    def _frame_as_string(self, frame):
-        return " ".join([hex(b) for b in frame])
-
-    def _clear_rx_buffer(self):
-        while self.uart.any():
-            self.uart.read()
-
-    def _read_frame(self):
-        if not self.uart.any():
-            return None
-    
-        if self.uart.any() % DFPLAYER_FRAME_SIZE != 0:
-            print("Warning: Incomplete frame in UART buffer, clearing buffer")
-            self._clear_rx_buffer()
-            return None
-        
-        return Frame(self.uart.read(DFPLAYER_FRAME_SIZE))
-
-    def _read_frames(self):
-        frames = deque([], 5)
-        while True:
-            f = self._read_frame()
-            if f is None:
-                return frames
-            frames.append(f)
 
     def _send_command(self, command, data_high = 0x0, data_low = 0x0, ack = True):
         # Ensure command is only one byte long
@@ -176,12 +186,14 @@ class DFPlayer:
         # For queries it seems that first the query response is sent,
         # then the ACK/ERROR response.
         if is_query:
-            cmd_response = self._read_frame()
+            self._frame_reader.update()
+            cmd_response = self._frame_reader.pop_frame()
             if cmd_response.command != command:
                 raise RuntimeError(f"Invalid response code received: {hex(cmd_response.command)} expected: {hex(command)}")
 
-        if ack:    
-            ack_response = self._read_frame()
+        if ack:
+            self._frame_reader.update()
+            ack_response = self._frame_reader.pop_frame()
             if ack_response.command != DFPLAYER_RESPONSE_OK:
                 raise RuntimeError(f"Command {hex(command)} was not acknowledged. Received: {hex(ack_response.command)} data: {hex(ack_response.data)}")
 
@@ -189,7 +201,8 @@ class DFPlayer:
             return cmd_response
 
         sleep_ms(25)  # Give some time before reading the error response
-        error_response = self._read_frame()
+        self._frame_reader.update()
+        error_response = self._frame_reader.pop_frame()
         
         # TODO: DEBUG, remove later
         if error_response is not None:
