@@ -52,25 +52,25 @@ DFPLAYER_RESPONSE_OK = const(0x41)  # Last command succeeded.
 # Common Commands
 DFPLAYER_CMD_NEXT = const(0x01)  # Start playing the next song.
 DFPLAYER_CMD_PREV = const(0x02)  # Start playing the next song.
-DFPLAYER_CMD_PLAY_TRACK = const(0x03)  # Play the given track. (DFROBOT: 0-2999) (MH2024/GD3200: 0-65535)
+# DFPLAYER_CMD_PLAY_TRACK = const(0x03)  # Play the given track. (DFROBOT: 0-2999) (MH2024/GD3200: 0-65535)
 DFPLAYER_CMD_VOLUME_INC = const(0x04)  # Increase volume.
 DFPLAYER_CMD_VOLUME_DEC = const(0x05)  # Decrease volume.
 DFPLAYER_CMD_SET_VOLUME = const(0x06)  # Set the volume to the given level. (0-30)
 DFPLAYER_CMD_SET_EQUALIZER = const(0x07)  # Set the equalizer to the given setting. (0-5)
-DFPLAYER_CMD_SET_SOURCE = const(0x09)  # Set the source to play files from.
+# DFPLAYER_CMD_SET_SOURCE = const(0x09)  # Set the source to play files from.
 DFPLAYER_CMD_STANDBY_ENTER = const(0x0a)  # Enter low power mode.
 DFPLAYER_CMD_RESET = const(0x0c)  # Reset the DFPlayer Mini.
 DFPLAYER_CMD_PLAY = const(0x0d)  # Start playing the selected file.
 DFPLAYER_CMD_PAUSE = const(0x0e)  # Pause the playback.
 DFPLAYER_CMD_FILE = const(0x0f)  # Play the given file (1-255) in the given folder (1-99)
-DFPLAYER_CMD_REPEAT_PLAYBACK = const(0x11)  # Start/stop repeat-playing the whole source. 1=loop 0=stop
+# DFPLAYER_CMD_REPEAT_PLAYBACK = const(0x11)  # Start/stop repeat-playing the whole source. 1=loop 0=stop
 DFPLAYER_CMD_GET_STATUS = const(0x42)  # Retrieve the current status.
 DFPLAYER_CMD_GET_VOLUME = const(0x43)  # Retrieve the current volume.
 DFPLAYER_CMD_GET_EQUALIZER = const(0x44)  # Retrieve the current equalizer setting.
-DFPLAYER_CMD_GET_MODE = const(0x45)  # Retrieve the current playback mode.
-DFPLAYER_CMD_GET_VERSION = const(0x46)  # Retrieve the device's software version.
-DFPLAYER_CMD_FILES_FLASH = const(0x49)  # Get the total number of files on the internal flash.
-DFPLAYER_CMD_FILENO_FLASH = const(0x4d)  # Get the currently select file number on the NOR flash.
+# DFPLAYER_CMD_GET_MODE = const(0x45)  # Retrieve the current playback mode.
+# DFPLAYER_CMD_GET_VERSION = const(0x46)  # Retrieve the device's software version.
+# DFPLAYER_CMD_FILES_FLASH = const(0x49)  # Get the total number of files on the internal flash.
+# DFPLAYER_CMD_FILENO_FLASH = const(0x4d)  # Get the currently select file number on the NOR flash.
 DFPLAYER_CMD_INIT = const(0x3f)  # TODO e.g. get online devices
 
 class Frame():
