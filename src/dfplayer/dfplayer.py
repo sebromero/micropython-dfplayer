@@ -148,16 +148,34 @@ class FrameReader():
             return None
         return self._frames[0]
 
-    def _read_frame(self):
-        if not self.uart.any():
+    def _read_frame(self, timeout_ms = 1000) -> Frame | None:
+        if self.uart.any() == 0:
+            # No data available
             return None
-    
-        if self.uart.any() % DFPLAYER_FRAME_SIZE != 0:
-            print("Warning: Incomplete frame in UART buffer, clearing buffer")
-            self._clear_rx_buffer()
-            return None
-        
-        return Frame(self.uart.read(DFPLAYER_FRAME_SIZE))
+
+        start_time = ticks_ms()
+
+        while True:
+            if timeout_ms is not None and (ticks_ms() - start_time) >= timeout_ms:
+                return None
+            
+            next_byte = self.uart.read(1)
+            if next_byte is None:
+                sleep_ms(10)
+                continue
+            if next_byte[0] == DFPLAYER_START:
+                break
+            else:
+                print(f"Discarding spurious byte: {hex(next_byte[0])}")
+
+        # Wait for the rest of the frame
+        while self.uart.any() < DFPLAYER_FRAME_SIZE - 1:
+            if timeout_ms is not None and (ticks_ms() - start_time) >= timeout_ms:
+                return None
+            sleep_ms(10)
+
+        data = self.uart.read(DFPLAYER_FRAME_SIZE - 1)  # Read the rest of the frame
+        return Frame(bytes([DFPLAYER_START]) + data)
 
 class PlayerStatus:
     STOPPED = 0
