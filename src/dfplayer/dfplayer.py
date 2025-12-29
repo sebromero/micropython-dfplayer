@@ -233,8 +233,6 @@ class DFPlayer:
 
     def _exec_command(self, command, data_high = 0x0, data_low = 0x0, delay_ms = DFPLAYER_DEFAULT_DELAY_MS, ack = True, is_query = False, check_error = False):
         self._send_command(command, data_high, data_low, ack)
-        sleep_ms(delay_ms)
-
         cmd_response = None
         
         # For queries it seems that first the query response is sent,
