@@ -115,7 +115,7 @@ class FrameReader():
         avail_bytes = self.uart.any()
         self.uart.read(avail_bytes)
 
-    def update(self, wait_for_frame = False, timeout_ms = 1000):
+    def update(self, await_frames = 0, timeout_ms = 1000):
         start_time = ticks_ms()
         while True:
             # Check for timeout
@@ -124,6 +124,11 @@ class FrameReader():
                         
             f = self._read_frame()
             if f is None:
+                # Wait until we have at least requested amount of frames
+                if len(self._frames) < await_frames:
+                    print("Waiting for frame...")
+                    sleep_ms(10)
+                    continue
                 return
             if f.is_notification:
                 print(f"Skipping notification code: {hex(f.command)} data: {hex(f.data)}")
@@ -218,13 +223,15 @@ class DFPlayer:
         # For queries it seems that first the query response is sent,
         # then the ACK/ERROR response.
         if is_query:
-            self._frame_reader.update()
+            self._frame_reader.update(await_frames=1)
+            print(f"Amount of frames available (query): {self._frame_reader.available_frames()}")
             cmd_response = self._frame_reader.pop_frame()
             if cmd_response.command != command:
                 raise RuntimeError(f"Invalid response code received: {hex(cmd_response.command)} expected: {hex(command)}")
 
         if ack:
-            self._frame_reader.update()
+            self._frame_reader.update(await_frames=1)
+            print(f"Amount of frames available (ack): {self._frame_reader.available_frames()}")
             ack_response = self._frame_reader.pop_frame()
             if ack_response.command != DFPLAYER_RESPONSE_OK:
                 raise RuntimeError(f"Command {hex(command)} was not acknowledged. Received: {hex(ack_response.command)} data: {hex(ack_response.data)}")
