@@ -38,7 +38,7 @@ class DFRobotPlayer(DFPlayer):
         """Play the given track number from the current folder"""
         if track_number < 0 or track_number > 2999:
             raise ValueError("Track number must be between 0 and 2999")            
-        self._exec_command(DFPLAYER_CMD_PLAY_TRACK, 0x00, track_number)
+        super().play_track_by_number(track_number)
 
     def exit_standby(self):
         """Exit low power mode, back to normal mode."""
@@ -70,6 +70,4 @@ class DFRobotPlayer(DFPlayer):
             raise RuntimeError("DFPlayer received incomplete frame")
         if response_data == DFPLAYER_ERROR_FCS:
             raise RuntimeError("DFPlayer received corrupted frame (FCS mismatch)")
-        if response_data == DFPLAYER_ERROR_NO_SUCH_FILE:
-            raise RuntimeError("No such file or folder")
         return super()._handle_error_response(response_data)

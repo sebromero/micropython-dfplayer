@@ -121,9 +121,13 @@ class FrameReader():
         # On ESP32 it uses Timer(0) which makes it unavailable for other uses
         #uart.irq(handler= lambda e: print("UART IRQ fired!"), trigger=UART.IRQ_RXIDLE)
 
-    def _clear_rx_buffer(self):
-        avail_bytes = self.uart.any()
-        self.uart.read(avail_bytes)
+    # def _clear_rx_buffer(self):
+    #     avail_bytes = self.uart.any()
+    #     self.uart.read(avail_bytes)
+
+    # def clear_error_frames(self):
+    #     """Remove all error frames from the internal buffer."""
+    #     self._frames = deque([f for f in self._frames if not f.is_error], 10)
 
     def update(self, await_frames = 0, timeout_ms = 1000):
         start_time = ticks_ms()
