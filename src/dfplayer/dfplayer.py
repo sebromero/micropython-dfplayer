@@ -2,7 +2,7 @@
 
 from micropython import const
 from machine import Pin
-from time import sleep_ms
+from time import sleep_ms, ticks_ms
 import struct
 from collections import deque
 
@@ -115,9 +115,13 @@ class FrameReader():
         avail_bytes = self.uart.any()
         self.uart.read(avail_bytes)
 
-    def update(self):
-        # TODO: Filter out System Responses
+    def update(self, wait_for_frame = False, timeout_ms = 1000):
+        start_time = ticks_ms()
         while True:
+            # Check for timeout
+            if timeout_ms is not None and (ticks_ms() - start_time) >= timeout_ms:
+                return
+                        
             f = self._read_frame()
             if f is None:
                 return
