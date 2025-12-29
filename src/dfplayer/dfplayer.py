@@ -126,7 +126,6 @@ class FrameReader():
             if f is None:
                 # Wait until we have at least requested amount of frames
                 if len(self._frames) < await_frames:
-                    print("Waiting for frame...")
                     sleep_ms(10)
                     continue
                 return
@@ -245,7 +244,9 @@ class DFPlayer:
             print(f"Amount of frames available (query): {self._frame_reader.available_frames()}")
             cmd_response = self._frame_reader.pop_frame()
             if cmd_response is None:
-                raise RuntimeError("No response received for query")
+                # No response received for query
+                return None
+
             if cmd_response.command != command:
                 raise RuntimeError(f"Invalid response code received: {hex(cmd_response.command)} expected: {hex(command)}")
 
@@ -339,8 +340,11 @@ class DFPlayer:
         self._exec_command(DFPLAYER_CMD_VOLUME_DEC)
     
     @property
-    def volume(self):
-        response_data = self._exec_command(DFPLAYER_CMD_GET_VOLUME, is_query=True).data
+    def volume(self) -> int | None:
+        response = self._exec_command(DFPLAYER_CMD_GET_VOLUME, is_query=True)
+        if response is None:
+            return None
+        response_data = response.data
         return int(response_data / DFPLAYER_MAX_VOLUME * 100)
 
     @volume.setter
@@ -374,7 +378,7 @@ class DFPlayer:
         self._send_command(DFPLAYER_CMD_STANDBY_ENTER)
 
     @property
-    def status(self) -> PlayerStatus:
+    def status(self) -> PlayerStatus | None:
         """
         Return the current status of the DFPlayer.
         The possible return values are:
@@ -382,7 +386,10 @@ class DFPlayer:
         - PlayerStatus.PLAYING
         - PlayerStatus.PAUSED
         """
-        response_data = self._exec_command(DFPLAYER_CMD_GET_STATUS, is_query=True).data
+        response = self._exec_command(DFPLAYER_CMD_GET_STATUS, is_query=True)
+        if response is None:
+            return None
+        response_data = response.data
         
         if response_data == DFPLAYER_STATUS_STOPPED:
             return PlayerStatus.STOPPED
