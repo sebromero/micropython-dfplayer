@@ -92,8 +92,11 @@ class Frame():
         else:
             raise ValueError("Invalid frame received:", self._frame_as_string(raw_data))
 
+    def _frame_as_string(self, raw_data):
+        return " ".join([hex(b) for b in raw_data])
+
     def __str__(self):
-        return " ".join([hex(b) for b in self.raw_data])
+        return self._frame_as_string(self.raw_data)
     
     @property
     def is_notification(self):
