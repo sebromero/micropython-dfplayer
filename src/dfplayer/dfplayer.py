@@ -32,8 +32,8 @@ DFPLAYER_PARITY = const(None)  # The DFPlayer does not use a parity bit.
 DFPLAYER_STOP_BITS = const(1)  # The DFPlayer uses 1 stop bit.
 
 # Classes of messages received from the DFPlayer
-#DFPLAYER_CLASS_MASK = const(0xf0)  # Use this mask to get the class from a response code.
-#DFPLAYER_CLASS_NOTIFY = const(0x30)  # Message is an event notification (unrelated to any command)
+DFPLAYER_CLASS_MASK = const(0xf0)  # Use bits 4-7 to get the class from a response code.
+DFPLAYER_CLASS_NOTIFY = const(0x30)  # Message is an event notification (unrelated to any command)
 
 # Bitmasks identifying the playback sources in the ready notification
 #DFPLAYER_MASK_USB = const(0x01)  # USB stick is connected.
@@ -95,6 +95,11 @@ class Frame():
     def __str__(self):
         return " ".join([hex(b) for b in self.raw_data])
     
+    @property
+    def is_notification(self):
+        """Return True if the frame is a notification from the DFPlayer."""
+        return (self.command & DFPLAYER_CLASS_MASK) == DFPLAYER_CLASS_NOTIFY
+    
 class FrameReader():
     def __init__(self, uart):
         self.uart = uart
@@ -113,8 +118,11 @@ class FrameReader():
             f = self._read_frame()
             if f is None:
                 return
+            if f.is_notification:
+                print(f"Skipping notification code: {hex(f.command)} data: {hex(f.data)}")
+                continue
             self._frames.append(f)
-
+            
     def available_frames(self):
         return len(self._frames)
     
