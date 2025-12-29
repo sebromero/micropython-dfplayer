@@ -9,7 +9,7 @@ from collections import deque
 # CONFIG
 DFPLAYER_DEFAULT_DELAY_MS = const(150) # Default delay after sending a command.
 DFPLAYER_BOOTUP_TIME_MS = const(3000)  # Boot up of the device takes 1.5 to 3 secs.
-DFPLAYER_TIMEOUT_MS = const(100)  # Default timeout waiting for a reply in milliseconds.
+DFPLAYER_TIMEOUT_UART_MS = const(100)  # Default timeout waiting for UART data in milliseconds.
 
 DFPLAYER_MAX_VOLUME = const(30)  # Maximum supported volume.
 DFPLAYER_MAX_FOLDER = const(99)  # Highest supported folder number.
@@ -175,7 +175,7 @@ class EqualizerMode:
 class DFPlayer:    
     def __init__(self, uart, busy_pin = None):
         self.uart = uart
-        uart.init(baudrate=DFPLAYER_BAUD, bits=DFPLAYER_DATA_BITS, parity=DFPLAYER_PARITY, stop=DFPLAYER_STOP_BITS, timeout=DFPLAYER_TIMEOUT_MS)
+        uart.init(baudrate=DFPLAYER_BAUD, bits=DFPLAYER_DATA_BITS, parity=DFPLAYER_PARITY, stop=DFPLAYER_STOP_BITS, timeout=DFPLAYER_TIMEOUT_UART_MS)
         self.busy_pin = busy_pin
         if busy_pin:
             self.busy_pin.init(Pin.IN)
