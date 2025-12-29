@@ -103,6 +103,16 @@ class Frame():
         """Return True if the frame is a notification from the DFPlayer."""
         return (self.command & DFPLAYER_CLASS_MASK) == DFPLAYER_CLASS_NOTIFY
     
+    @property
+    def is_error(self):
+        """Return True if the frame is an error response from the DFPlayer."""
+        return self.command == DFPLAYER_RESPONSE_ERROR
+    
+    @property
+    def is_ack(self):
+        """Return True if the frame is an ACK response from the DFPlayer."""
+        return self.command == DFPLAYER_RESPONSE_OK
+
 class FrameReader():
     def __init__(self, uart):
         self.uart = uart
@@ -251,7 +261,7 @@ class DFPlayer:
             self._frame_reader.update(await_frames=1)
             print(f"Amount of frames available (ack): {self._frame_reader.available_frames()}")
             ack_response = self._frame_reader.pop_frame()
-            if ack_response.command != DFPLAYER_RESPONSE_OK:
+            if not ack_response.is_ack:
                 raise RuntimeError(f"Command {hex(command)} was not acknowledged. Received: {hex(ack_response.command)} data: {hex(ack_response.data)}")
 
         if not check_error:
@@ -267,7 +277,7 @@ class DFPlayer:
         else:
             print("No error response received")
 
-        if error_response and error_response.command == DFPLAYER_RESPONSE_ERROR:
+        if error_response and error_response.is_error:
             self._handle_error_response(error_response.data)
 
         return cmd_response
