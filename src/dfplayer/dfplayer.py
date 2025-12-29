@@ -235,8 +235,7 @@ class DFPlayer:
         self._send_command(command, data_high, data_low, ack)
         cmd_response = None
         
-        # For queries it seems that first the query response is sent,
-        # then the ACK/ERROR response.
+        # For queries it seems that first the query response is sent, then the ACK/ERROR response.
         if is_query:
             self._frame_reader.update(await_frames=1)
             print(f"Amount of frames available (query): {self._frame_reader.available_frames()}")
@@ -258,8 +257,8 @@ class DFPlayer:
         if not check_error:
             return cmd_response
 
-        sleep_ms(25)  # Give some time before reading the error response
-        self._frame_reader.update()
+        # Error response should be received within a short time
+        self._frame_reader.update(await_frames=1, timeout_ms=100)
         error_response = self._frame_reader.pop_frame()
         
         # TODO: DEBUG, remove later
