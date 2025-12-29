@@ -226,6 +226,8 @@ class DFPlayer:
             self._frame_reader.update(await_frames=1)
             print(f"Amount of frames available (query): {self._frame_reader.available_frames()}")
             cmd_response = self._frame_reader.pop_frame()
+            if cmd_response is None:
+                raise RuntimeError("No response received for query")
             if cmd_response.command != command:
                 raise RuntimeError(f"Invalid response code received: {hex(cmd_response.command)} expected: {hex(command)}")
 
