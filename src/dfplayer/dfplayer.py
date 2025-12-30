@@ -121,13 +121,11 @@ class FrameReader():
         # On ESP32 it uses Timer(0) which makes it unavailable for other uses
         #uart.irq(handler= lambda e: print("UART IRQ fired!"), trigger=UART.IRQ_RXIDLE)
 
-    # def _clear_rx_buffer(self):
-    #     avail_bytes = self.uart.any()
-    #     self.uart.read(avail_bytes)
-
-    # def clear_error_frames(self):
-    #     """Remove all error frames from the internal buffer."""
-    #     self._frames = deque([f for f in self._frames if not f.is_error], 10)
+    def clear(self):
+        """Clear all frames from the internal buffer."""
+        while len(self._frames) > 0:
+            f = self._frames.popleft()
+            print(f"DEBUG: Discarding frame during clear: {f}")
 
     def update(self, await_frames = 0, timeout_ms = 1000):
         start_time = ticks_ms()
@@ -246,13 +244,18 @@ class DFPlayer:
         raise RuntimeError(f"Unknown error. Data: {hex(response_data)}")          
 
     def _exec_command(self, command, data_high = 0x0, data_low = 0x0, delay_ms = DFPLAYER_DEFAULT_DELAY_MS, ack = True, is_query = False, check_error = False):
+        # There shouldn't be any pending frames when sending a new command
+        # however, if a response was received after the previous command timed out, it might be still in the buffer
+        self._frame_reader.update()
+        self._frame_reader.clear()
+
         self._send_command(command, data_high, data_low, ack)
         cmd_response = None
         
         # For queries it seems that first the query response is sent, then the ACK/ERROR response.
         if is_query:
             self._frame_reader.update(await_frames=1)
-            print(f"Amount of frames available (query): {self._frame_reader.available_frames()}")
+            # print(f"Amount of frames available (query): {self._frame_reader.available_frames()}")
             cmd_response = self._frame_reader.pop_frame()
             if cmd_response is None:
                 # No response received for query
@@ -263,7 +266,7 @@ class DFPlayer:
 
         if ack:
             self._frame_reader.update(await_frames=1)
-            print(f"Amount of frames available (ack): {self._frame_reader.available_frames()}")
+            # print(f"Amount of frames available (ack): {self._frame_reader.available_frames()}")
             ack_response = self._frame_reader.pop_frame()
             if not ack_response or not ack_response.is_ack:
                 raise RuntimeError(f"Command {hex(command)} was not acknowledged. Received: {hex(ack_response.command)} data: {hex(ack_response.data)}")
@@ -272,15 +275,12 @@ class DFPlayer:
             return cmd_response
 
         # Error response should be received within a short time
-        self._frame_reader.update(await_frames=1, timeout_ms=100)
+        # Increase the timeout to ~1000ms to account for edge cases
+        # e.g. when executing play_track(1,123) while inserting an SD card
+        # and the track does not exist, it takes roughly 1s to respond with the error.
+        self._frame_reader.update(await_frames=1, timeout_ms=150)
         error_response = self._frame_reader.pop_frame()
         
-        # TODO: DEBUG, remove later
-        if error_response is not None:
-            print(f"Error response: {hex(error_response.command)} data: {hex(error_response.data)}")
-        else:
-            print("No error response received")
-
         if error_response and error_response.is_error:
             self._handle_error_response(error_response.data)
 
@@ -289,6 +289,7 @@ class DFPlayer:
     def reset(self):
         """Reset the DFPlayer."""
         self._exec_command(DFPLAYER_CMD_RESET, ack=False, delay_ms=DFPLAYER_BOOTUP_TIME_MS)
+        # Reset command seems to generate spurious data in the UART buffer
         spurious_data = self.uart.any() % DFPLAYER_FRAME_SIZE
         if spurious_data > 0:
             # print(f"Clearing {spurious_data} bytes of spurious data from UART buffer after reset")
@@ -296,7 +297,6 @@ class DFPlayer:
         self._frame_reader.update()
         last_frame = self._frame_reader.peek_frame()
         if last_frame and last_frame.command == DFPLAYER_CMD_INIT:
-            # print("Removing bootup OK response from frame reader")
             self._frame_reader.pop_frame()  # Remove the bootup OK response
 
     def next_track(self):
