@@ -7,6 +7,7 @@ import struct
 from collections import deque
 
 # CONFIG
+# TODO: Remove the following line after testing
 DFPLAYER_DEFAULT_DELAY_MS = const(150) # Default delay after sending a command.
 DFPLAYER_BOOTUP_TIME_MS = const(3000)  # Boot up of the device takes 1.5 to 3 secs.
 DFPLAYER_TIMEOUT_UART_MS = const(100)  # Default timeout waiting for UART data in milliseconds.
@@ -34,6 +35,13 @@ DFPLAYER_STOP_BITS = const(1)  # The DFPlayer uses 1 stop bit.
 # Classes of messages received from the DFPlayer
 DFPLAYER_CLASS_MASK = const(0xf0)  # Use bits 4-7 to get the class from a response code.
 DFPLAYER_CLASS_NOTIFY = const(0x30)  # Message is an event notification (unrelated to any command)
+
+# Notification codes sent by the DFPlayer Mini
+DFPLAYER_NOTIFY_INSERT = const(0x3a)  # A USB storage device or an SD card was inserted.
+DFPLAYER_NOTIFY_EJECT = const(0x3b)  # A USB storage device or an SD card was ejected.
+DFPLAYER_NOTIFY_DONE_USB = const(0x3c)  # Completed playing the indicated track from USB storage.
+DFPLAYER_NOTIFY_DONE_SDCARD = const(0x3d)  # Completed playing the indicated track from SD card.
+DFPLAYER_NOTIFY_DONE_FLASH = const(0x3e)  # Completed playing the indicated track from flash.
 
 # Bitmasks identifying the playback sources in the ready notification
 #DFPLAYER_MASK_USB = const(0x01)  # USB stick is connected.
