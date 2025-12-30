@@ -52,6 +52,9 @@ DFPLAYER_RESPONSE_OK = const(0x41)  # Last command succeeded.
 
 # Error codes sent as parameter of error messages
 DFPLAYER_ERROR_NO_SUCH_FILE = const(0x06)  # File/folder selected for playback (command 0x06) does not exist.
+DFPLAYER_ERROR_BUSY = const(0x00)  # Module is busy.
+DFPLAYER_ERROR_FRAME = const(0x01)  # Received incomplete frame.
+DFPLAYER_ERROR_FCS = const(0x02)  # Frame check sequence of last frame didn't match.
 
 # Common Commands
 DFPLAYER_CMD_NEXT = const(0x01)  # Start playing the next song.
@@ -241,6 +244,12 @@ class DFPlayer:
     def _handle_error_response(self, response_data):
         if response_data == DFPLAYER_ERROR_NO_SUCH_FILE:
             raise RuntimeError("No such file or folder")
+        if response_data == DFPLAYER_ERROR_BUSY:
+            raise RuntimeError("DFPlayer is busy")
+        if response_data == DFPLAYER_ERROR_FRAME:
+            raise RuntimeError("DFPlayer received incomplete frame")
+        if response_data == DFPLAYER_ERROR_FCS:
+            raise RuntimeError("DFPlayer received corrupted frame (FCS mismatch)")
         raise RuntimeError(f"Unknown error. Data: {hex(response_data)}")          
 
     def _exec_command(self, command, data_high = 0x0, data_low = 0x0, delay_ms = DFPLAYER_DEFAULT_DELAY_MS, ack = True, is_query = False, check_error = False):

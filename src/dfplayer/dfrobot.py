@@ -15,9 +15,6 @@ DFPLAYER_CMD_FILENO_FLASH = const(0x4d)  # Get the currently select file number 
 
 # Error codes sent as parameter of error messages
 # TODO: Test as these are unverified
-DFPLAYER_ERROR_BUSY = const(0x00)  # Module is busy.
-DFPLAYER_ERROR_FRAME = const(0x01)  # Received incomplete frame.
-DFPLAYER_ERROR_FCS = const(0x02)  # Frame check sequence of last frame didn't match.
 
 class PlaybackSource:
     USB = 0
@@ -62,12 +59,3 @@ class DFRobotPlayer(DFPlayer):
     #     if mode < 0 or mode > 1:
     #         raise ValueError("Playback mode must be 0 or 1")
     #     self._send_command(DFPLAYER_CMD_SET_PLAYBACK_MODE, 0x00, mode)
-
-    def _handle_error_response(self, response_data):
-        if response_data == DFPLAYER_ERROR_BUSY:
-            raise RuntimeError("DFPlayer is busy")
-        if response_data == DFPLAYER_ERROR_FRAME:
-            raise RuntimeError("DFPlayer received incomplete frame")
-        if response_data == DFPLAYER_ERROR_FCS:
-            raise RuntimeError("DFPlayer received corrupted frame (FCS mismatch)")
-        return super()._handle_error_response(response_data)
