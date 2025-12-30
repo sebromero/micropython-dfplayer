@@ -14,7 +14,8 @@ DFPLAYER_TIMEOUT_UART_MS = const(100)  # Default timeout waiting for UART data i
 
 DFPLAYER_MAX_VOLUME = const(30)  # Maximum supported volume.
 DFPLAYER_MAX_FOLDER = const(99)  # Highest supported folder number.
-DFPLAYER_MAX_MP3_FILE = const(255)  # Highest supported file number in the "MP3" folder.
+DFPLAYER_MAX_FILE = const(255)  # Highest supported file number in the "MP3" folder.
+DFPLAYER_MAX_MP3_FILE = const(65536)  # Highest supported file number in the "MP3" folder.
 DFPLAYER_MAX_ADVERT_FILE = const(65536)  # Highest supported file number in the "ADVERT" folder.
 
 # Constants used in frames sent to the DFPlayer Mini
@@ -42,6 +43,10 @@ DFPLAYER_NOTIFY_EJECT = const(0x3b)  # A USB storage device or an SD card was ej
 DFPLAYER_NOTIFY_DONE_USB = const(0x3c)  # Completed playing the indicated track from USB storage.
 DFPLAYER_NOTIFY_DONE_SDCARD = const(0x3d)  # Completed playing the indicated track from SD card.
 DFPLAYER_NOTIFY_DONE_FLASH = const(0x3e)  # Completed playing the indicated track from flash.
+
+# Device identifiers in insert/eject notifications
+DFPLAYER_DEVICE_USB = const(0x01)  # A USB storage device was inserted/ejected.
+DFPLAYER_DEVICE_SDCARD = const(0x02)  # An SD card was inserted/ejected.
 
 # Bitmasks identifying the playback sources in the ready notification
 #DFPLAYER_MASK_USB = const(0x01)  # USB stick is connected.
@@ -388,7 +393,7 @@ class DFPlayer:
         """Play the given track number from the given folder."""
         if folder < 0 or folder > DFPLAYER_MAX_FOLDER:
             raise ValueError("Folder number must be between 0 and 99")
-        if track < 0 or track > DFPLAYER_MAX_MP3_FILE:
+        if track < 0 or track > DFPLAYER_MAX_FILE:
             raise ValueError("Track number must be between 0 and 255")
         self._exec_command(DFPLAYER_CMD_PLAY_FILE, folder, track, check_error=True)
 

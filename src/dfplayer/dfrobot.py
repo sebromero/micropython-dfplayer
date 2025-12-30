@@ -1,8 +1,6 @@
 from micropython import const
 from .dfplayer import DFPlayer, DFPLAYER_CMD_PLAY_TRACK, DFPLAYER_CMD_SET_SOURCE
 
-# TODO Depends on device. test
-DFPLAYER_SEND_DELAY_MS = const(100)  # Wait 100ms after a cmd to work around hw bug.    
 DFPLAYER_CMD_SET_PLAYBACK_MODE = const(0x08)  # Set the playback mode. (0-3)
 DFPLAYER_CMD_STANDBY_EXIT = const(0x0b)  # Exit low power mode, back to normal mode.
 DFPLAYER_CMD_VOLUME_ADJUST_SET = const(0x10) # TODO

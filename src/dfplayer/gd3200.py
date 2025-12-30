@@ -2,7 +2,6 @@ from micropython import const
 # from .dfplayer import DFPlayer, DFPLAYER_CMD_PLAY_TRACK, DFPLAYER_CMD_SET_SOURCE
 from dfplayer import DFPlayer, DFPLAYER_CMD_SET_SOURCE
 
-# TODO Depends on device. test
 DFPLAYER_SINGLE_TRACK_LOOP = const(0x08)  # Loops single track (0-65535)
 # DFPLAYER_CMD_FILE_LARGE = const(0x14)  # Play the given file (1-4095) in the given folder (1-15).
 # DFPLAYER_CMD_ABORT_ADVERT = const(0x15)  # Abort advert playback and resume current playback.
@@ -11,19 +10,12 @@ DFPLAYER_SINGLE_TRACK_LOOP = const(0x08)  # Loops single track (0-65535)
 # DFPLAYER_CMD_REPEAT = const(0x19)  # 0 = repeat currently played file, 1 = stop repeating
 # DFPLAYER_CMD_ADVERT_FOLDER = const(0x25) # Set the advert folder 1-9
 
-
 DFPLAYER_CMD_FILES_USB = const(0x47)  # Get the total number of files on USB storage.
 DFPLAYER_CMD_FILES_SDCARD = const(0x48)  # Get the total number of files on the SD card.
 DFPLAYER_CMD_FILENO_USB = const(0x4b)  # Get the currently select file number on the USB storage.
 DFPLAYER_CMD_FILENO_SDCARD = const(0x4c)  # Get the currently select file number on the SD-Card.    
 DFPLAYER_CMD_FILES_IN_FOLDER = const(0x4e)  # Get the number of files in the current folder.
 DFPLAYER_CMD_FOLDERS = const(0x4f)  # Get the number of folders.
-DFPLAYER_MAX_MP3_FILE = const(65536)  # Highest supported file number in the "MP3" folder.
-
-# Device identifiers in insert/eject notifications
-# TODO: Test as these are unverified
-DFPLAYER_DEVICE_USB = const(0x01)  # A USB storage device was inserted/ejected.
-DFPLAYER_DEVICE_SDCARD = const(0x02)  # An SD card was inserted/ejected.
 
 class PlaybackSource:
     USB = 1
