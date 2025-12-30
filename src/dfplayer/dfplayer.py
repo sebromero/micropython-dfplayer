@@ -37,7 +37,8 @@ DFPLAYER_STOP_BITS = const(1)  # The DFPlayer uses 1 stop bit.
 DFPLAYER_CLASS_MASK = const(0xf0)  # Use bits 4-7 to get the class from a response code.
 DFPLAYER_CLASS_NOTIFY = const(0x30)  # Message is an event notification (unrelated to any command)
 
-# Notification codes sent by the DFPlayer Mini
+# Notification codes
+# Note: Done frames contain the track number in the data field
 DFPLAYER_NOTIFY_INSERT = const(0x3a)  # A USB storage device or an SD card was inserted.
 DFPLAYER_NOTIFY_EJECT = const(0x3b)  # A USB storage device or an SD card was ejected.
 DFPLAYER_NOTIFY_DONE_USB = const(0x3c)  # Completed playing the indicated track from USB storage.
@@ -51,6 +52,7 @@ DFPLAYER_DEVICE_SDCARD = const(0x02)  # An SD card was inserted/ejected.
 # Bitmasks identifying the playback sources in the ready notification
 #DFPLAYER_MASK_USB = const(0x01)  # USB stick is connected.
 #DFPLAYER_MASK_SDCARD = const(0x02)  # SD-Card is connected.
+#DFPLAYER_MASK_USB_SDCARD = const(0x03)  # Both USB stick and SD-Card are connected.
 #DFPLAYER_MASK_PC = const(0x04)  # Unclear, has something to do with debugging.
 #DFPLAYER_MASK_FLASH = const(0x08)  # NOR flash is connected.
 
@@ -413,9 +415,11 @@ class DFPlayer:
             raise ValueError("Track number must be between 0 and 9999")
         self._exec_command(DFPLAYER_CMD_PLAY_FROM_MP3, track_number >> 8, track_number & 0xFF, check_error=True)
 
+    # TODO: Test this again on DFRobot hardware
+    # Looks like it enters stanby but is broken afterwards
     def enter_standby(self):
         """Enter or exit standby mode."""
-        self._send_command(DFPLAYER_CMD_STANDBY_ENTER)
+        self._exec_command(DFPLAYER_CMD_STANDBY_ENTER)
 
     @property
     def status(self) -> PlayerStatus | None:

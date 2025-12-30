@@ -39,15 +39,15 @@ class DFRobotPlayer(DFPlayer):
         """Exit low power mode, back to normal mode."""
         self._exec_command(DFPLAYER_CMD_STANDBY_EXIT)
 
-    def set_playback_source(self, source : PlaybackSource):
-        """
-        Set the playback source.
-        0 = U-disk, 1 = SD card, 2 = AUX, 3 = SLEEP, 4 = FLASH
-        """
-        if source < 0 or source > 4:
-            raise ValueError("Playback source must be between 0 and 4")
-        # According to the datasheet, this command takes 200ms
-        self._exec_command(DFPLAYER_CMD_SET_SOURCE, 0x00, source, 200)
+    # def set_playback_source(self, source : PlaybackSource):
+    #     """
+    #     Set the playback source.
+    #     0 = U-disk, 1 = SD card, 2 = AUX, 3 = SLEEP, 4 = FLASH
+    #     """
+    #     if source < 0 or source > 4:
+    #         raise ValueError("Playback source must be between 0 and 4")
+    #     # According to the datasheet, this command takes 200ms
+    #     self._exec_command(DFPLAYER_CMD_SET_SOURCE, 0x00, source, 200)
 
     # def set_playback_mode(self, mode: PlaybackMode):
     #     """
