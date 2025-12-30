@@ -5,7 +5,6 @@ from dfplayer import DFPlayer, DFPLAYER_CMD_SET_SOURCE
 # TODO Depends on device. test
 DFPLAYER_SINGLE_TRACK_LOOP = const(0x08)  # Loops single track (0-65535)
 DFPLAYER_CMD_FILE_LARGE = const(0x14)  # Play the given file (1-4095) in the given folder (1-15).
-DFPLAYER_CMD_PLAY_FROM_MP3 = const(0x12)  # Play the given file (1-9999) from the folder "MP3"
 DFPLAYER_CMD_ABORT_ADVERT = const(0x15)  # Abort advert playback and resume current playback.
 DFPLAYER_CMD_REPEAT_FOLDER = const(0x17)  # Start repeat-playing the given folder (1-99)
 DFPLAYER_CMD_RANDOM = const(0x18)  # Start playing all files in random order.
@@ -44,12 +43,6 @@ class GD3200Player(DFPlayer):
         if track_number < 0 or track_number > 65535:
             raise ValueError("Track number must be between 0 and 65535")            
         super().play_track_by_number(track_number)
-
-    # def play_from_mp3_folder(self, track_number):
-    #     """Play the given track number from the "MP3" folder."""
-    #     if track_number < 0 or track_number > DFPLAYER_MAX_MP3_FILE:
-    #         raise ValueError("Track number must be between 0 and 9999")
-    #     self._send_command(DFPLAYER_CMD_PLAY_FROM_MP3, track_number >> 8, track_number & 0xFF)
 
     # def set_playback_source(self, source : PlaybackSource):
     #     """

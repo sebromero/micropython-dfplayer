@@ -48,7 +48,7 @@ DFPLAYER_STATUS_PAUSED  = const(0x02) # The DFPlayer is paused.
 
 # Response codes sent by the DFPlayer
 DFPLAYER_RESPONSE_ERROR = const(0x40)  # While processing the most recent command an error occurred.
-DFPLAYER_RESPONSE_OK = const(0x41)  # Last command succeeded.
+DFPLAYER_RESPONSE_ACK = const(0x41)  # Last command succeeded.
 
 # Error codes sent as parameter of error messages
 DFPLAYER_ERROR_NO_SUCH_FILE = const(0x06)  # File/folder selected for playback (command 0x06) does not exist.
@@ -69,9 +69,10 @@ DFPLAYER_CMD_STANDBY_ENTER = const(0x0a)  # Enter low power mode.
 DFPLAYER_CMD_RESET = const(0x0c)  # Reset the DFPlayer Mini.
 DFPLAYER_CMD_PLAY = const(0x0d)  # Start playing the selected file.
 DFPLAYER_CMD_PAUSE = const(0x0e)  # Pause the playback.
+DFPLAYER_CMD_PLAY_FILE = const(0x0f)  # Play the given file (1-255) in the given folder (1-99)
+DFPLAYER_CMD_PLAY_FROM_MP3 = const(0x12)  # Play the given file (1-9999) from the folder "MP3"
 DFPLAYER_CMD_STOP = const(0x16)  # Stop playback.
 DFPLAYER_CMD_MUTE = const(0x1a)  # Mute/unmute the audio output. 0=unmute, 1=mute
-DFPLAYER_CMD_FILE = const(0x0f)  # Play the given file (1-255) in the given folder (1-99)
 DFPLAYER_CMD_PLAY_ADVERT = const(0x13)  # Play the given file (1-9999) from the folder "ADVERT", resume current playback afterwards.
 # DFPLAYER_CMD_REPEAT_PLAYBACK = const(0x11)  # Start/stop repeat-playing the whole source. 1=loop 0=stop
 DFPLAYER_CMD_GET_STATUS = const(0x42)  # Retrieve the current status.
@@ -114,7 +115,7 @@ class Frame():
     @property
     def is_ack(self):
         """Return True if the frame is an ACK response from the DFPlayer."""
-        return self.command == DFPLAYER_RESPONSE_OK
+        return self.command == DFPLAYER_RESPONSE_ACK
 
 class FrameReader():
     def __init__(self, uart):
@@ -381,7 +382,7 @@ class DFPlayer:
             raise ValueError("Folder number must be between 0 and 99")
         if track < 0 or track > DFPLAYER_MAX_MP3_FILE:
             raise ValueError("Track number must be between 0 and 255")
-        self._exec_command(DFPLAYER_CMD_FILE, folder, track, check_error=True)
+        self._exec_command(DFPLAYER_CMD_PLAY_FILE, folder, track, check_error=True)
 
     def play_track_by_number(self, track_number):
         """Play the given track number from the flattened, alphabetically sorted file list."""
@@ -392,6 +393,12 @@ class DFPlayer:
         if track_number < 0 or track_number > DFPLAYER_MAX_ADVERT_FILE:
             raise ValueError("Track number must be between 0 and 9999")
         self._send_command(DFPLAYER_CMD_PLAY_ADVERT, track_number >> 8, track_number & 0xFF)
+
+    def play_from_mp3_folder(self, track_number):
+        """Play the given track number (0001-65535) from the "MP3" folder."""
+        if track_number < 0 or track_number > DFPLAYER_MAX_MP3_FILE:
+            raise ValueError("Track number must be between 0 and 9999")
+        self._exec_command(DFPLAYER_CMD_PLAY_FROM_MP3, track_number >> 8, track_number & 0xFF, check_error=True)
 
     def enter_standby(self):
         """Enter or exit standby mode."""
