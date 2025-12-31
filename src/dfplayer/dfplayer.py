@@ -286,8 +286,10 @@ class DFPlayer:
             self._frame_reader.update(await_frames=1)
             # print(f"Amount of frames available (ack): {self._frame_reader.available_frames()}")
             ack_response = self._frame_reader.pop_frame()
-            if not ack_response or not ack_response.is_ack:
-                raise RuntimeError(f"Command {hex(command)} was not acknowledged. Received: {hex(ack_response.command)} data: {hex(ack_response.data)}")
+            if not ack_response:
+                raise RuntimeError(f"Command {hex(command)} was not acknowledged.")
+            elif not ack_response.is_ack:
+                raise RuntimeError(f"Received non-ack message for command {hex(command)}. Code: {hex(ack_response.command)} data: {hex(ack_response.data)}")
 
         if not check_error:
             return cmd_response
