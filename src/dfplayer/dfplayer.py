@@ -310,16 +310,20 @@ class DFPlayer:
 
     def reset(self):
         """Reset the DFPlayer."""
-        self._exec_command(DFPLAYER_CMD_RESET, ack=False, delay_ms=DFPLAYER_BOOTUP_TIME_MS)
+        self._exec_command(DFPLAYER_CMD_RESET)
+        sleep_ms(DFPLAYER_BOOTUP_TIME_MS)
         # Reset command seems to generate spurious data in the UART buffer
         spurious_data = self.uart.any() % DFPLAYER_FRAME_SIZE
         if spurious_data > 0:
             # print(f"Clearing {spurious_data} bytes of spurious data from UART buffer after reset")
             self.uart.read(spurious_data)
-        self._frame_reader.update()
-        last_frame = self._frame_reader.peek_frame()
-        if last_frame and last_frame.command == DFPLAYER_CMD_INIT:
-            self._frame_reader.pop_frame()  # Remove the bootup OK response
+        
+        # TODO: Remove. Handled by notification filtering
+        # self._frame_reader.update()
+        # last_frame = self._frame_reader.peek_frame()
+        # if last_frame and last_frame.command == DFPLAYER_CMD_INIT:
+        #     print("Removing bootup OK response from buffer")
+        #     self._frame_reader.pop_frame()  # Remove the bootup OK response
 
     def next_track(self):
         self._exec_command(DFPLAYER_CMD_NEXT)
