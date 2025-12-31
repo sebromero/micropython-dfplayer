@@ -365,7 +365,7 @@ class DFPlayer:
         """Play the given track number from the "ADVERT" folder."""
         if track_number < 0 or track_number > DFPLAYER_MAX_ADVERT_FILE:
             raise ValueError("Track number must be between 0 and 9999")
-        self._send_command(DFPLAYER_CMD_PLAY_ADVERT, track_number >> 8, track_number & 0xFF)
+        self._exec_command(DFPLAYER_CMD_PLAY_ADVERT, track_number >> 8, track_number & 0xFF, check_error=True)
 
     def play_from_mp3_folder(self, track_number):
         """Play the given track number (0001-65535) from the "MP3" folder."""
