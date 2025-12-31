@@ -11,29 +11,30 @@ DFPLAYER_CMD_STANDBY_EXIT = const(0x0b)  # Exit low power mode, back to normal m
 # DFPLAYER_CMD_FILENO_USB = const(0x4c)  # Get the currently select file number on the USB storage.
 # DFPLAYER_CMD_FILENO_FLASH = const(0x4d)  # Get the currently select file number on the NOR flash.
 
-# Error codes sent as parameter of error messages
-# TODO: Test as these are unverified
+# class PlaybackSource:
+#     USB = 0
+#     SD_CARD = 1
+#     AUX = 2
+#     SLEEP = 3
+#     FLASH = 4
 
-class PlaybackSource:
-    USB = 0
-    SD_CARD = 1
-    AUX = 2
-    SLEEP = 3
-    FLASH = 4
-
-class PlaybackMode:
-    REPEAT = 0
-    FOLDER_REPEAT = 1
-    SINGLE_REPEAT = 2
-    RANDOM = 3
+# class PlaybackMode:
+#     REPEAT = 0
+#     FOLDER_REPEAT = 1
+#     SINGLE_REPEAT = 2
+#     RANDOM = 3
 
 class DFRobotPlayer(DFPlayer):
+
+    # OVERRIDES
 
     def play_track_by_number(self, track_number):
         """Play the given track number from the current folder"""
         if track_number < 0 or track_number > 2999:
             raise ValueError("Track number must be between 0 and 2999")            
         super().play_track_by_number(track_number)
+
+    # Additional commands
 
     def exit_standby(self):
         """Exit low power mode, back to normal mode."""

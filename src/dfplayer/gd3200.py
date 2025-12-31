@@ -16,10 +16,10 @@ DFPLAYER_SINGLE_TRACK_LOOP = const(0x08)  # Loops single track (0-65535)
 # DFPLAYER_CMD_FILES_IN_FOLDER = const(0x4e)  # Get the number of files in the current folder.
 # DFPLAYER_CMD_FOLDERS = const(0x4f)  # Get the number of folders.
 
-class PlaybackSource:
-    USB = 1
-    SD_CARD = 2
-    FLASH = 4
+# class PlaybackSource:
+#     USB = 1
+#     SD_CARD = 2
+#     FLASH = 4
 
 class GD3200Player(DFPlayer):
 
@@ -45,3 +45,5 @@ class GD3200Player(DFPlayer):
     #         raise ValueError("Playback source must be between 1 and 4")
     #     # According to the datasheet, this command takes 200ms
     #     self._exec_command(DFPLAYER_CMD_SET_SOURCE, 0x00, source, 200)
+
+    
