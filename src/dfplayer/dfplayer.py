@@ -358,7 +358,7 @@ class DFPlayer:
         self._exec_command(DFPLAYER_CMD_PLAY_FILE, folder, track, check_error=True)
 
     def play_track_by_number(self, track_number):
-        """Play the given track number from the flattened, alphabetically sorted file list."""
+        """Play the given track number from the flattened file list."""
         self._exec_command(DFPLAYER_CMD_PLAY_TRACK, track_number >> 8, track_number & 0xFF)
 
     def play_from_advert_folder(self, track_number):

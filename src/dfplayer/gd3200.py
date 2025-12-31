@@ -24,7 +24,12 @@ DFPLAYER_SINGLE_TRACK_LOOP = const(0x08)  # Loops single track (0-65535)
 class GD3200Player(DFPlayer):
 
     def play_track_by_number(self, track_number):
-        """Play the given track number from the current folder"""
+        """
+        Play the given track number from the flattened file list.
+        The order of tracks is determined by the underlying file table.
+        Hence the order of copying files to the storage influences the order.
+        Folders are ignored.
+        """
         if track_number < 0 or track_number > 65535:
             raise ValueError("Track number must be between 0 and 65535")            
         super().play_track_by_number(track_number)

@@ -29,7 +29,13 @@ class DFRobotPlayer(DFPlayer):
     # OVERRIDES
 
     def play_track_by_number(self, track_number):
-        """Play the given track number from the current folder"""
+        """
+        Play the given track number from the flattened file list.
+        The order of tracks is determined by the underlying file table.
+        Hence the order of copying files to the storage influences the order.
+        Folders are NOT ignored. Trying to play a track that represents a folder
+        will result in no playback.
+        """
         if track_number < 0 or track_number > 2999:
             raise ValueError("Track number must be between 0 and 2999")            
         super().play_track_by_number(track_number)
