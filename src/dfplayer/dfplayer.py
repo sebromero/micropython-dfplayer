@@ -16,7 +16,6 @@ DFPLAYER_MAX_VOLUME = const(30)  # Maximum supported volume.
 DFPLAYER_MAX_FOLDER = const(99)  # Highest supported folder number.
 DFPLAYER_MAX_FILE = const(255)  # Highest supported file number in the "MP3" folder.
 DFPLAYER_MAX_MP3_FILE = const(65536)  # Highest supported file number in the "MP3" folder.
-DFPLAYER_MAX_ADVERT_FILE = const(65536)  # Highest supported file number in the "ADVERT" folder.
 
 # Constants used in frames sent to the DFPlayer Mini
 DFPLAYER_FRAME_SIZE = const(10)  # Size of a frame sent to the DFPlayer Mini.
@@ -89,7 +88,6 @@ DFPLAYER_CMD_PLAY_FILE = const(0x0f)  # Play the given file (1-255) in the given
 DFPLAYER_CMD_PLAY_FROM_MP3 = const(0x12)  # Play the given file (1-9999) from the folder "MP3"
 DFPLAYER_CMD_STOP = const(0x16)  # Stop playback.
 DFPLAYER_CMD_MUTE = const(0x1a)  # Mute/unmute the audio output. 0=unmute, 1=mute
-DFPLAYER_CMD_PLAY_ADVERT = const(0x13)  # Play the given file (1-9999) from the folder "ADVERT", resume current playback afterwards.
 # DFPLAYER_CMD_REPEAT_PLAYBACK = const(0x11)  # Start/stop repeat-playing the whole source. 1=loop 0=stop
 DFPLAYER_CMD_GET_STATUS = const(0x42)  # Retrieve the current status.
 DFPLAYER_CMD_GET_VOLUME = const(0x43)  # Retrieve the current volume.
@@ -360,12 +358,6 @@ class DFPlayer:
     def play_track_by_number(self, track_number):
         """Play the given track number from the flattened file list."""
         self._exec_command(DFPLAYER_CMD_PLAY_TRACK, track_number >> 8, track_number & 0xFF)
-
-    def play_from_advert_folder(self, track_number):
-        """Play the given track number from the "ADVERT" folder."""
-        if track_number < 0 or track_number > DFPLAYER_MAX_ADVERT_FILE:
-            raise ValueError("Track number must be between 0 and 9999")
-        self._exec_command(DFPLAYER_CMD_PLAY_ADVERT, track_number >> 8, track_number & 0xFF, check_error=True)
 
     def play_from_mp3_folder(self, track_number):
         """Play the given track number (0001-65535) from the "MP3" folder."""

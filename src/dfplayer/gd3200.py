@@ -1,7 +1,10 @@
 from micropython import const
 from .dfplayer import DFPlayer, DFPLAYER_CMD_SET_SOURCE
 
-DFPLAYER_SINGLE_TRACK_LOOP = const(0x08)  # Loops single track (0-65535)
+DFPLAYER_MAX_ADVERT_FILE = const(65536)  # Highest supported file number in the "ADVERT" folder.
+
+DFPLAYER_CMD_SINGLE_TRACK_LOOP = const(0x08)  # Loops single track (0-65535)
+DFPLAYER_CMD_PLAY_ADVERT = const(0x13)  # Play the given file (1-9999) from the folder "ADVERT", resume current playback afterwards.
 # DFPLAYER_CMD_FILE_LARGE = const(0x14)  # Play the given file (1-4095) in the given folder (1-15).
 # DFPLAYER_CMD_ABORT_ADVERT = const(0x15)  # Abort advert playback and resume current playback.
 # DFPLAYER_CMD_REPEAT_FOLDER = const(0x17)  # Start repeat-playing the given folder (1-99)
@@ -39,7 +42,13 @@ class GD3200Player(DFPlayer):
         Loop the given track ID (0-65535) indefinitely.
         The index is the file number from the flattened file list sorted alphabetically.
         """
-        self._exec_command(DFPLAYER_SINGLE_TRACK_LOOP, track_id >> 8, track_id & 0xFF, check_error=True)
+        self._exec_command(DFPLAYER_CMD_SINGLE_TRACK_LOOP, track_id >> 8, track_id & 0xFF, check_error=True)
+
+    def play_from_advert_folder(self, track_number):
+        """Play the given track number from the "ADVERT" folder."""
+        if track_number < 0 or track_number > DFPLAYER_MAX_ADVERT_FILE:
+            raise ValueError("Track number must be between 0 and 9999")
+        self._exec_command(DFPLAYER_CMD_PLAY_ADVERT, track_number >> 8, track_number & 0xFF, check_error=True)
 
     # def set_playback_source(self, source : PlaybackSource):
     #     """
