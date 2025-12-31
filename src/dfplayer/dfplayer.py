@@ -402,7 +402,7 @@ class DFPlayer:
         if response_data == DFPLAYER_STATUS_PAUSED:
             return PlayerStatus.PAUSED
         
-        return None
+        raise RuntimeError(f"Unknown status code received: {hex(response_data)}")
 
     @property
     def playing(self):
