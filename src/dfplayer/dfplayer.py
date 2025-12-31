@@ -57,6 +57,7 @@ DFPLAYER_DEVICE_SDCARD = const(0x02)  # An SD card was inserted/ejected.
 #DFPLAYER_MASK_FLASH = const(0x08)  # NOR flash is connected.
 
 # Status bitmasks
+DFPLAYER_STATUS_MASK = const(0x0f)  # Use bits 0-3 to get the status from a response code.
 DFPLAYER_STATUS_STOPPED = const(0x00) # The DFPlayer is currently stopped e.g. done playing a song.
 DFPLAYER_STATUS_PLAYING = const(0x01) # The DFPlayer is currently playing a song.
 DFPLAYER_STATUS_PAUSED  = const(0x02) # The DFPlayer is paused.
@@ -208,11 +209,14 @@ class FrameReader():
         return Frame(bytes([DFPLAYER_START]) + data)
 
 class PlayerStatus:
+    # Arbitrary values representing player status
     STOPPED = 0
     PLAYING = 1
     PAUSED = 2
 
 class EqualizerMode:
+    # These numbers directly map to 
+    # the DFPlayer equalizer settings
     NORMAL = 0
     POP = 1
     ROCK = 2
@@ -387,7 +391,9 @@ class DFPlayer:
         response = self._exec_command(DFPLAYER_CMD_GET_STATUS, is_query=True)
         if response is None:
             return None
-        response_data = response.data
+        
+        # MSB contains the source of the playback (USB/SD/Sleep), not available on all versions
+        response_data = response.data & DFPLAYER_STATUS_MASK
         
         if response_data == DFPLAYER_STATUS_STOPPED:
             return PlayerStatus.STOPPED
