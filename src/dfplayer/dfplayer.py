@@ -144,7 +144,7 @@ class FrameReader():
         """Clear all frames from the internal buffer."""
         while len(self._frames) > 0:
             f = self._frames.popleft()
-            print(f"DEBUG: Discarding frame during clear. Code: {f.command} Data: {f.data}")
+            print(f"DEBUG: Discarding frame during clear. Code: {hex(f.command)} Data: {hex(f.data)}")
 
     def update(self, await_frames = 0, timeout_ms = 1000):
         start_time = ticks_ms()

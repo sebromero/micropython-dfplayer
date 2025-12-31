@@ -1,15 +1,15 @@
 from micropython import const
 from .dfplayer import DFPlayer, DFPLAYER_CMD_PLAY_TRACK, DFPLAYER_CMD_SET_SOURCE
 
-DFPLAYER_CMD_SET_PLAYBACK_MODE = const(0x08)  # Set the playback mode. (0-3)
 DFPLAYER_CMD_STANDBY_EXIT = const(0x0b)  # Exit low power mode, back to normal mode.
-DFPLAYER_CMD_VOLUME_ADJUST_SET = const(0x10) # TODO
+# DFPLAYER_CMD_SET_PLAYBACK_MODE = const(0x08)  # Set the playback mode. (0-3)
+# DFPLAYER_CMD_VOLUME_ADJUST_SET = const(0x10) # TODO
 
-DFPLAYER_CMD_FILES_SDCARD = const(0x47)  # Get the total number of files on the SD card.
-DFPLAYER_CMD_FILES_USB = const(0x48)  # Get the total number of files on USB storage.
-DFPLAYER_CMD_FILENO_SDCARD = const(0x4b)  # Get the currently select file number on the SD-Card.
-DFPLAYER_CMD_FILENO_USB = const(0x4c)  # Get the currently select file number on the USB storage.
-DFPLAYER_CMD_FILENO_FLASH = const(0x4d)  # Get the currently select file number on the NOR flash.
+# DFPLAYER_CMD_FILES_SDCARD = const(0x47)  # Get the total number of files on the SD card.
+# DFPLAYER_CMD_FILES_USB = const(0x48)  # Get the total number of files on USB storage.
+# DFPLAYER_CMD_FILENO_SDCARD = const(0x4b)  # Get the currently select file number on the SD-Card.
+# DFPLAYER_CMD_FILENO_USB = const(0x4c)  # Get the currently select file number on the USB storage.
+# DFPLAYER_CMD_FILENO_FLASH = const(0x4d)  # Get the currently select file number on the NOR flash.
 
 # Error codes sent as parameter of error messages
 # TODO: Test as these are unverified

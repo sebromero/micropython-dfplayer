@@ -1,6 +1,5 @@
 from micropython import const
-# from .dfplayer import DFPlayer, DFPLAYER_CMD_PLAY_TRACK, DFPLAYER_CMD_SET_SOURCE
-from dfplayer import DFPlayer, DFPLAYER_CMD_SET_SOURCE
+from .dfplayer import DFPlayer, DFPLAYER_CMD_SET_SOURCE
 
 DFPLAYER_SINGLE_TRACK_LOOP = const(0x08)  # Loops single track (0-65535)
 # DFPLAYER_CMD_FILE_LARGE = const(0x14)  # Play the given file (1-4095) in the given folder (1-15).
@@ -10,12 +9,12 @@ DFPLAYER_SINGLE_TRACK_LOOP = const(0x08)  # Loops single track (0-65535)
 # DFPLAYER_CMD_REPEAT = const(0x19)  # 0 = repeat currently played file, 1 = stop repeating
 # DFPLAYER_CMD_ADVERT_FOLDER = const(0x25) # Set the advert folder 1-9
 
-DFPLAYER_CMD_FILES_USB = const(0x47)  # Get the total number of files on USB storage.
-DFPLAYER_CMD_FILES_SDCARD = const(0x48)  # Get the total number of files on the SD card.
-DFPLAYER_CMD_FILENO_USB = const(0x4b)  # Get the currently select file number on the USB storage.
-DFPLAYER_CMD_FILENO_SDCARD = const(0x4c)  # Get the currently select file number on the SD-Card.    
-DFPLAYER_CMD_FILES_IN_FOLDER = const(0x4e)  # Get the number of files in the current folder.
-DFPLAYER_CMD_FOLDERS = const(0x4f)  # Get the number of folders.
+# DFPLAYER_CMD_FILES_USB = const(0x47)  # Get the total number of files on USB storage.
+# DFPLAYER_CMD_FILES_SDCARD = const(0x48)  # Get the total number of files on the SD card.
+# DFPLAYER_CMD_FILENO_USB = const(0x4b)  # Get the currently select file number on the USB storage.
+# DFPLAYER_CMD_FILENO_SDCARD = const(0x4c)  # Get the currently select file number on the SD-Card.    
+# DFPLAYER_CMD_FILES_IN_FOLDER = const(0x4e)  # Get the number of files in the current folder.
+# DFPLAYER_CMD_FOLDERS = const(0x4f)  # Get the number of folders.
 
 class PlaybackSource:
     USB = 1
@@ -46,9 +45,3 @@ class GD3200Player(DFPlayer):
     #         raise ValueError("Playback source must be between 1 and 4")
     #     # According to the datasheet, this command takes 200ms
     #     self._exec_command(DFPLAYER_CMD_SET_SOURCE, 0x00, source, 200)
-
-
-if __name__ == "__main__":
-    from machine import UART, Pin
-    uart1 = UART(0, tx=Pin("TX"), rx=Pin("RX"))
-    player1 = GD3200Player(uart1)
