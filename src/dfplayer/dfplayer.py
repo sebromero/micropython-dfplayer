@@ -144,7 +144,7 @@ class FrameReader():
         """Clear all frames from the internal buffer."""
         while len(self._frames) > 0:
             f = self._frames.popleft()
-            print(f"DEBUG: Discarding frame during clear: {f}")
+            print(f"DEBUG: Discarding frame during clear. Code: {f.command} Data: {f.data}")
 
     def update(self, await_frames = 0, timeout_ms = 1000):
         start_time = ticks_ms()
@@ -234,13 +234,6 @@ class DFPlayer:
     def _on_busy_pin_change(self, pin):
          # High level during playback; Low in pause status and module sleep
         self._playing = pin.value() == 0
-
-    @property
-    def playing(self):
-        """Return True if the DFPlayer is currently playing a song."""
-        if self.busy_pin: # If we have a busy pin, use it
-            return self._playing
-        return self.status == PlayerStatus.PLAYING
 
     def _send_command(self, command, data_high = 0x0, data_low = 0x0, ack = True):
         # Ensure command is only one byte long
@@ -344,53 +337,12 @@ class DFPlayer:
         value = 0x01 if muted else 0x00
         self._exec_command(DFPLAYER_CMD_MUTE, 0x00, value)
 
-    @property
-    def equalizer_mode(self):
-        """Return the current equalizer setting."""
-        response_data = self._exec_command(DFPLAYER_CMD_GET_EQUALIZER, is_query=True).data
-        if response_data == 0:
-            return EqualizerMode.NORMAL
-        if response_data == 1:
-            return EqualizerMode.POP
-        if response_data == 2:
-            return EqualizerMode.ROCK
-        if response_data == 3:
-            return EqualizerMode.JAZZ
-        if response_data == 4:
-            return EqualizerMode.CLASSIC
-        if response_data == 5:
-            return EqualizerMode.BASS
-        return None
-    
-    @equalizer_mode.setter
-    def equalizer_mode(self, value: EqualizerMode):
-        """Set the equalizer mode."""
-        if value < 0 or value > 5:
-            raise ValueError("Equalizer mode must be between 0 and 5")
-        self._exec_command(DFPLAYER_CMD_SET_EQUALIZER, 0x00, value)
-
     def increase_volume(self):
         self._exec_command(DFPLAYER_CMD_VOLUME_INC)
 
     def decrease_volume(self):
         self._exec_command(DFPLAYER_CMD_VOLUME_DEC)
     
-    @property
-    def volume(self) -> int | None:
-        response = self._exec_command(DFPLAYER_CMD_GET_VOLUME, is_query=True)
-        if response is None:
-            return None
-        response_data = response.data
-        return int(response_data / DFPLAYER_MAX_VOLUME * 100)
-
-    @volume.setter
-    def volume(self, value : int):
-        """Set the volume of the DFPlayer in percent (0-100%)."""
-        if value < 0 or value > 100:
-            raise ValueError("Volume must be between 0 and 100")        
-        value = int(value / 100 * DFPLAYER_MAX_VOLUME) # Map to range 0 - 30
-        self._exec_command(DFPLAYER_CMD_SET_VOLUME, 0x00, value)
-
     def play_track(self, folder, track):
         """Play the given track number from the given folder."""
         if folder < 0 or folder > DFPLAYER_MAX_FOLDER:
@@ -444,31 +396,50 @@ class DFPlayer:
         
         return None
 
-if __name__ == "__main__":
-    from machine import UART
-    from time import sleep_ms
-    uart1 = UART(0, tx=Pin("TX"), rx=Pin("RX"))
-    uart2 = UART(1, tx=Pin("D9"), rx=Pin("D8"))
-    player1 = DFPlayer(uart1)
-    player2 = DFPlayer(uart2)
-    # player.reset()
-    #busy_pin = Pin("D4")
-    #player = DFPlayer(uart, busy_pin)
-    # print(f"Status: {player.status}")
-    # player.volume = 20
-    # print(f"Volume: {player.volume}")
-    # player.play() # Play the current / first track
-    # sleep_ms(5000)
-    # print("Pausing")
-    # player.pause()
-    # print(f"Status: {player.status}")
-    # print("Playing")
-    # player.play()
-    # sleep_ms(1000)
-    # print("Next track")
-    # player.next_track()
-    # sleep_ms(5000)
-    # print("Next track")
-    # player.next_track()
-    # sleep_ms(5000)
-    #player.play_track(2, 1) # Play track 1 from folder 2
+    @property
+    def playing(self):
+        """Return True if the DFPlayer is currently playing a song."""
+        if self.busy_pin: # If we have a busy pin, use it
+            return self._playing
+        return self.status == PlayerStatus.PLAYING
+    
+    @property
+    def volume(self) -> int | None:
+        response = self._exec_command(DFPLAYER_CMD_GET_VOLUME, is_query=True)
+        if response is None:
+            return None
+        response_data = response.data
+        return int(response_data / DFPLAYER_MAX_VOLUME * 100)
+
+    @volume.setter
+    def volume(self, value : int):
+        """Set the volume of the DFPlayer in percent (0-100%)."""
+        if value < 0 or value > 100:
+            raise ValueError("Volume must be between 0 and 100")        
+        value = int(value / 100 * DFPLAYER_MAX_VOLUME) # Map to range 0 - 30
+        self._exec_command(DFPLAYER_CMD_SET_VOLUME, 0x00, value)
+
+    @property
+    def equalizer_mode(self):
+        """Return the current equalizer setting."""
+        response_data = self._exec_command(DFPLAYER_CMD_GET_EQUALIZER, is_query=True).data
+        if response_data == 0:
+            return EqualizerMode.NORMAL
+        if response_data == 1:
+            return EqualizerMode.POP
+        if response_data == 2:
+            return EqualizerMode.ROCK
+        if response_data == 3:
+            return EqualizerMode.JAZZ
+        if response_data == 4:
+            return EqualizerMode.CLASSIC
+        if response_data == 5:
+            return EqualizerMode.BASS
+        return None
+    
+    @equalizer_mode.setter
+    def equalizer_mode(self, value: EqualizerMode):
+        """Set the equalizer mode."""
+        if value < 0 or value > 5:
+            raise ValueError("Equalizer mode must be between 0 and 5")
+        self._exec_command(DFPLAYER_CMD_SET_EQUALIZER, 0x00, value)
