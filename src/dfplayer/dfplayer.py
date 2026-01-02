@@ -142,12 +142,26 @@ class FrameReader():
             f = self._frames.popleft()
             print(f"DEBUG: Discarding frame during clear. Code: {hex(f.command)} Data: {hex(f.data)}")
 
-    def update(self, await_frames = 0, timeout_ms = 1000):
+    def update(self, await_frames = 0, timeout_ms = 1000) -> int:
+        """
+        Read frames from the UART and store them in the internal buffer.
+        If await_frames > 0, wait until at least that many frames are available or timeout occurs.
+        If timeout_ms is None, wait indefinitely.
+        
+        Parameters:
+            await_frames (int): Number of frames to wait for before returning. Default is 0 (no wait).
+            timeout_ms (int | None): Maximum time to wait in milliseconds. None means wait indefinitely
+
+        Returns:
+            int: Number of frames added to the internal buffer during this call.
+        """
         start_time = ticks_ms()
+        frames_added = 0
+
         while True:
             # Check for timeout
             if timeout_ms is not None and (ticks_ms() - start_time) >= timeout_ms:
-                return
+                return frames_added
                         
             f = self._read_frame()
             if f is None:
@@ -155,11 +169,12 @@ class FrameReader():
                 if len(self._frames) < await_frames:
                     sleep_ms(10)
                     continue
-                return
+                return frames_added
             if f.is_notification:
                 print(f"Skipping notification code: {hex(f.command)} data: {hex(f.data)}")
                 continue
             self._frames.append(f)
+            frames_added += 1
             
     def available_frames(self):
         return len(self._frames)
