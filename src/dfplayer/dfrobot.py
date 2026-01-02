@@ -62,11 +62,11 @@ class DFRobotPlayer(DFPlayer):
     #     # According to the datasheet, this command takes 200ms
     #     self._exec_command(DFPLAYER_CMD_SET_SOURCE, 0x00, source, 200)
 
-    # def set_playback_mode(self, mode: PlaybackMode):
+    # def set_playback_mode(self, mode: int):
     #     """
     #     Set the playback mode (0 - 3). 
     #     0 = repeat, 1 = folder repeat, 2 = single repeat, 3 = random.
     #     """
-    #     if mode < 0 or mode > 1:
-    #         raise ValueError("Playback mode must be 0 or 1")
-    #     self._send_command(DFPLAYER_CMD_SET_PLAYBACK_MODE, 0x00, mode)
+    #     if mode < 0 or mode > 3:
+    #         raise ValueError("Playback mode must be between 0 and 3")
+    #     self._exec_command(DFPLAYER_CMD_SET_PLAYBACK_MODE, 0x00, mode)
