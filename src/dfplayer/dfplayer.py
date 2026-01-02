@@ -371,7 +371,7 @@ class DFPlayer:
 
     def play_track_by_number(self, track_number):
         """Play the given track number from the flattened file list."""
-        self._exec_command(DFPLAYER_CMD_PLAY_TRACK, track_number >> 8, track_number & 0xFF)
+        self._exec_command(DFPLAYER_CMD_PLAY_TRACK, track_number >> 8, track_number & 0xFF, check_error=True)
 
     def play_from_mp3_folder(self, track_number):
         """Play the given track number (0001-65535) from the "MP3" folder."""
