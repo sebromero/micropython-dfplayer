@@ -98,12 +98,21 @@ class Frame():
         if raw_data is None or len(raw_data) != DFPLAYER_FRAME_SIZE:
             raise ValueError(f"Frame data must be exactly {DFPLAYER_FRAME_SIZE} bytes")
         
-        if raw_data[0] == DFPLAYER_START and raw_data[1] == DFPLAYER_VERSION and raw_data[2] == DFPLAYER_LEN and raw_data[9] == DFPLAYER_END:
-            self.command = raw_data[3]
-            self.data = struct.unpack('>H', raw_data[5:7])[0]
-            self.raw_data = raw_data
-        else:
-            raise ValueError("Invalid frame received:", self._frame_as_string(raw_data))
+        if raw_data[0] != DFPLAYER_START:
+            raise ValueError(f"Invalid frame start byte ({hex(raw_data[0])}) in frame: {self._frame_as_string(raw_data)}")
+
+        if  raw_data[1] != DFPLAYER_VERSION:
+            raise ValueError(f"Invalid frame version byte ({hex(raw_data[1])}) in frame: {self._frame_as_string(raw_data)}")
+        
+        if raw_data[2] != DFPLAYER_LEN:
+            raise ValueError(f"Invalid frame length byte ({hex(raw_data[2])}) in frame: {self._frame_as_string(raw_data)}")
+        
+        if raw_data[9] != DFPLAYER_END:
+            raise ValueError(f"Invalid frame end byte ({hex(raw_data[9])}) in frame: {self._frame_as_string(raw_data)}")    
+
+        self.command = raw_data[3]
+        self.data = struct.unpack('>H', raw_data[5:7])[0]
+        self.raw_data = raw_data
 
     def _frame_as_string(self, raw_data):
         return " ".join([hex(b) for b in raw_data])
