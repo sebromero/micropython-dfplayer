@@ -87,7 +87,7 @@ DFPLAYER_CMD_MUTE = const(0x1a)  # Mute/unmute the audio output. 0=unmute, 1=mut
 DFPLAYER_CMD_GET_STATUS = const(0x42)  # Retrieve the current status.
 DFPLAYER_CMD_GET_VOLUME = const(0x43)  # Retrieve the current volume.
 DFPLAYER_CMD_GET_EQUALIZER = const(0x44)  # Retrieve the current equalizer setting.
-# DFPLAYER_CMD_GET_MODE = const(0x45)  # Retrieve the current playback mode.
+DFPLAYER_CMD_GET_PLAYBACK_MODE = const(0x45)  # Retrieve the current playback mode.
 DFPLAYER_CMD_GET_VERSION = const(0x46)  # Retrieve the device's software version.
 # DFPLAYER_CMD_FILES_FLASH = const(0x49)  # Get the total number of files on the internal flash.
 # DFPLAYER_CMD_FILENO_FLASH = const(0x4d)  # Get the currently select file number on the NOR flash.
@@ -460,6 +460,14 @@ class DFPlayer:
     def software_version(self) -> int | None:
         """Return the DFPlayer software version as a number."""
         response = self._exec_command(DFPLAYER_CMD_GET_VERSION, is_query=True)
+        if response is None:
+            return None
+        return response.data
+    
+    @property
+    def playback_mode(self) -> int | None:
+        """Return the current playback mode."""
+        response = self._exec_command(DFPLAYER_CMD_GET_PLAYBACK_MODE, is_query=True)
         if response is None:
             return None
         return response.data

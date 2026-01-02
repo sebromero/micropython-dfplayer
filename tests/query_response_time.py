@@ -2,7 +2,9 @@ from machine import UART, Pin
 from time import sleep_ms
 from dfplayer import DFRobotPlayer, GD3200Player
 
-from dfplayer.dfplayer import DFPLAYER_CMD_GET_VOLUME, DFPLAYER_CMD_GET_STATUS, DFPLAYER_CMD_GET_VERSION, DFPLAYER_CMD_GET_EQUALIZER
+from dfplayer.dfplayer import DFPLAYER_CMD_GET_VOLUME, DFPLAYER_CMD_GET_STATUS
+from dfplayer.dfplayer import DFPLAYER_CMD_GET_VERSION, DFPLAYER_CMD_GET_EQUALIZER
+from dfplayer.dfplayer import DFPLAYER_CMD_GET_PLAYBACK_MODE
 
 uart1 = UART(0, tx=Pin("TX"), rx=Pin("RX"))
 uart2 = UART(1, tx=Pin("D9"), rx=Pin("D8"))
@@ -46,4 +48,6 @@ for player in players:
     print(f"Response time for version: {response_time_version} ms")
     response_time_eq = get_response_time(player, DFPLAYER_CMD_GET_EQUALIZER)
     print(f"Response time for equalizer: {response_time_eq} ms")
+    response_time_mode = get_response_time(player, DFPLAYER_CMD_GET_PLAYBACK_MODE)
+    print(f"Response time for playback mode: {response_time_mode} ms")
     print("-----")
