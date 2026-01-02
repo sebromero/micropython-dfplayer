@@ -83,7 +83,7 @@ DFPLAYER_CMD_PLAY_FILE = const(0x0f)  # Play the given file (1-255) in the given
 DFPLAYER_CMD_PLAY_FROM_MP3 = const(0x12)  # Play the given file (1-9999) from the folder "MP3"
 DFPLAYER_CMD_STOP = const(0x16)  # Stop playback.
 DFPLAYER_CMD_MUTE = const(0x1a)  # Mute/unmute the audio output. 0=unmute, 1=mute
-# DFPLAYER_CMD_REPEAT_PLAYBACK = const(0x11)  # Start/stop repeat-playing the whole source. 1=loop 0=stop
+DFPLAYER_CMD_REPEAT_ALL = const(0x11)  # Start/stop repeat-playing the whole source. 1=loop 0=stop
 DFPLAYER_CMD_GET_STATUS = const(0x42)  # Retrieve the current status.
 DFPLAYER_CMD_GET_VOLUME = const(0x43)  # Retrieve the current volume.
 DFPLAYER_CMD_GET_EQUALIZER = const(0x44)  # Retrieve the current equalizer setting.
@@ -388,6 +388,14 @@ class DFPlayer:
             raise ValueError("Track number must be between 0 and 9999")
         self._exec_command(DFPLAYER_CMD_PLAY_FROM_MP3, track_number >> 8, track_number & 0xFF, check_error=True)
 
+    def repeat_all(self, repeat: bool):
+        """
+        Starts repeat playback of all files in the root directory in chronological order.
+        If repeat is False, stops repeat playback and stops playback.
+        """
+        value = 0x01 if repeat else 0x00
+        self._exec_command(DFPLAYER_CMD_REPEAT_ALL, 0x00, value)
+
     def enter_standby(self):
         """Enter or exit standby mode."""
         self._exec_command(DFPLAYER_CMD_STANDBY_ENTER)
@@ -475,8 +483,12 @@ class DFPlayer:
     
     @property
     def playback_mode(self) -> int | None:
-        """Return the current playback mode."""
+        """
+        Return the current playback mode.
+        The meaning of the return values is device-dependent.
+        """
         response = self._exec_command(DFPLAYER_CMD_GET_PLAYBACK_MODE, is_query=True)
         if response is None:
             return None
         return response.data
+    

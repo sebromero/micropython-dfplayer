@@ -31,6 +31,8 @@ DFPLAYER_ERROR_FCS = const(0x04)  # Frame check sequence of last frame didn't ma
 
 class GD3200Player(DFPlayer):
 
+    # OVERRIDES
+
     def play_track_by_number(self, track_number):
         """
         Play the given track number from the flattened file list.
@@ -42,15 +44,24 @@ class GD3200Player(DFPlayer):
             raise ValueError("Track number must be between 0 and 65535")            
         super().play_track_by_number(track_number)
 
+    def repeat_all(self, repeat):
+        # TODO: Further investigate this
+        raise NotImplementedError("GD3200Player should support repeat all but it's broken.")
+
+    # Additional commands
+
     def loop_track(self, track_id):
         """
-        Loop the given track ID (0-65535) indefinitely.
+        Loop the given track ID (0-65535) indefinitely. Starts playback.
         The index is the file number from the flattened file list sorted alphabetically.
         """
         self._exec_command(DFPLAYER_CMD_SINGLE_TRACK_LOOP, track_id >> 8, track_id & 0xFF, check_error=True)
 
     def play_from_advert_folder(self, track_number):
-        """Play the given track number from the "ADVERT" folder."""
+        """
+        Play the given track number from the "ADVERT" folder.
+        Resumes playback afterwards no matter if playback was active or not.
+        """
         if track_number < 0 or track_number > DFPLAYER_MAX_ADVERT_FILE:
             raise ValueError("Track number must be between 0 and 9999")
         self._exec_command(DFPLAYER_CMD_PLAY_ADVERT, track_number >> 8, track_number & 0xFF, check_error=True)

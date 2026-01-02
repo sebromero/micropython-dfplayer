@@ -62,6 +62,7 @@ class DFRobotPlayer(DFPlayer):
     #     # According to the datasheet, this command takes 200ms
     #     self._exec_command(DFPLAYER_CMD_SET_SOURCE, 0x00, source, 200)
 
+    # TODO: Doesn't seem to work on DFROBOT|LISP3
     # def set_playback_mode(self, mode: int):
     #     """
     #     Set the playback mode (0 - 3). 
