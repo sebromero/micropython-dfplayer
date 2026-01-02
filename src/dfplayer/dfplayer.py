@@ -67,9 +67,6 @@ DFPLAYER_RESPONSE_ACK = const(0x41)  # Last command succeeded.
 
 # Error codes sent as parameter of error messages
 DFPLAYER_ERROR_NO_SUCH_FILE = const(0x06)  # File/folder selected for playback (command 0x06) does not exist.
-DFPLAYER_ERROR_BUSY = const(0x00)  # Module is busy.
-DFPLAYER_ERROR_FRAME = const(0x01)  # Received incomplete frame.
-DFPLAYER_ERROR_FCS = const(0x02)  # Frame check sequence of last frame didn't match.
 
 # Common Commands
 DFPLAYER_CMD_NEXT = const(0x01)  # Start playing the next song.
@@ -282,7 +279,7 @@ class DFPlayer:
                 return None
 
             if cmd_response.command != command:
-                raise RuntimeError(f"Invalid response code received: {hex(cmd_response.command)} expected: {hex(command)}")
+                raise RuntimeError(f"Invalid response code. Expected: {hex(command)}, received: {hex(cmd_response.command)}, data: {hex(cmd_response.data)}")
 
         if ack:
             self._frame_reader.update(await_frames=1)

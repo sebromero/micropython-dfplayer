@@ -11,6 +11,11 @@ DFPLAYER_CMD_STANDBY_EXIT = const(0x0b)  # Exit low power mode, back to normal m
 # DFPLAYER_CMD_FILENO_USB = const(0x4c)  # Get the currently select file number on the USB storage.
 # DFPLAYER_CMD_FILENO_FLASH = const(0x4d)  # Get the currently select file number on the NOR flash.
 
+# Error codes sent as parameter of error messages
+DFPLAYER_ERROR_BUSY = const(0x00)  # Module is busy.
+DFPLAYER_ERROR_FRAME = const(0x01)  # Received incomplete frame.
+DFPLAYER_ERROR_FCS = const(0x02)  # Frame check sequence of last frame didn't match.
+
 # class PlaybackSource:
 #     USB = 0
 #     SD_CARD = 1
@@ -42,6 +47,7 @@ class DFRobotPlayer(DFPlayer):
 
     # Additional commands
 
+    # TODO: Doesn't seem to work on DFROBOT|LISP3
     def exit_standby(self):
         """Exit low power mode, back to normal mode."""
         self._exec_command(DFPLAYER_CMD_STANDBY_EXIT)
