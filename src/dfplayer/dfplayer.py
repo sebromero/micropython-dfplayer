@@ -90,7 +90,7 @@ DFPLAYER_CMD_GET_STATUS = const(0x42)  # Retrieve the current status.
 DFPLAYER_CMD_GET_VOLUME = const(0x43)  # Retrieve the current volume.
 DFPLAYER_CMD_GET_EQUALIZER = const(0x44)  # Retrieve the current equalizer setting.
 # DFPLAYER_CMD_GET_MODE = const(0x45)  # Retrieve the current playback mode.
-# DFPLAYER_CMD_GET_VERSION = const(0x46)  # Retrieve the device's software version.
+DFPLAYER_CMD_GET_VERSION = const(0x46)  # Retrieve the device's software version.
 # DFPLAYER_CMD_FILES_FLASH = const(0x49)  # Get the total number of files on the internal flash.
 # DFPLAYER_CMD_FILENO_FLASH = const(0x4d)  # Get the currently select file number on the NOR flash.
 DFPLAYER_CMD_INIT = const(0x3f)  # TODO e.g. get online devices
@@ -444,3 +444,10 @@ class DFPlayer:
         if value < 0 or value > 5:
             raise ValueError("Equalizer mode must be between 0 and 5")
         self._exec_command(DFPLAYER_CMD_SET_EQUALIZER, 0x00, value)
+    @property
+    def software_version(self) -> int | None:
+        """Return the DFPlayer software version as a number."""
+        response = self._exec_command(DFPLAYER_CMD_GET_VERSION, is_query=True)
+        if response is None:
+            return None
+        return response.data
