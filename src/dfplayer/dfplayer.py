@@ -7,8 +7,6 @@ import struct
 from collections import deque
 
 # CONFIG
-# TODO: Remove the following line after testing
-DFPLAYER_DEFAULT_DELAY_MS = const(150) # Default delay after sending a command.
 DFPLAYER_BOOTUP_TIME_MS = const(3000)  # Boot up of the device takes 1.5 to 3 secs.
 DFPLAYER_TIMEOUT_UART_MS = const(100)  # Default timeout waiting for UART data in milliseconds.
 
@@ -275,7 +273,7 @@ class DFPlayer:
             raise RuntimeError("DFPlayer received corrupted frame (FCS mismatch)")
         raise RuntimeError(f"Unknown error. Data: {hex(response_data)}")          
 
-    def _exec_command(self, command, data_high = 0x0, data_low = 0x0, delay_ms = DFPLAYER_DEFAULT_DELAY_MS, ack = True, is_query = False, check_error = False):
+    def _exec_command(self, command, data_high = 0x0, data_low = 0x0, ack = True, is_query = False, check_error = False):
         # There shouldn't be any pending frames when sending a new command
         # however, if a response was received after the previous command timed out, it might be still in the buffer
         self._frame_reader.update()
@@ -381,8 +379,6 @@ class DFPlayer:
             raise ValueError("Track number must be between 0 and 9999")
         self._exec_command(DFPLAYER_CMD_PLAY_FROM_MP3, track_number >> 8, track_number & 0xFF, check_error=True)
 
-    # TODO: Test this again on DFRobot hardware
-    # Looks like it enters stanby but is broken afterwards
     def enter_standby(self):
         """Enter or exit standby mode."""
         self._exec_command(DFPLAYER_CMD_STANDBY_ENTER)
@@ -459,6 +455,7 @@ class DFPlayer:
         if value < 0 or value > 5:
             raise ValueError("Equalizer mode must be between 0 and 5")
         self._exec_command(DFPLAYER_CMD_SET_EQUALIZER, 0x00, value)
+
     @property
     def software_version(self) -> int | None:
         """Return the DFPlayer software version as a number."""
