@@ -297,7 +297,7 @@ class DFPlayer:
         # Increase the timeout to ~1000ms to account for edge cases
         # e.g. when executing play_track(1,123) while inserting an SD card
         # and the track does not exist, it takes roughly 1s to respond with the error.
-        self._frame_reader.update(await_frames=1, timeout_ms=150)
+        self._frame_reader.update(await_frames=1, timeout_ms=200)
         error_response = self._frame_reader.pop_frame()
         
         if error_response and error_response.is_error:
