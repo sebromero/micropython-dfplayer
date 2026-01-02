@@ -1,3 +1,14 @@
+"""
+To run this test, make sure you have the following files on the SD card:
+
+- MP3/0001.mp3
+- 01/001.mp3
+- 01/002.mp3
+
+In the root:
+- <any file 1>.mp3
+- <any file 2>.mp3
+"""
 from machine import UART, Pin
 from time import sleep_ms
 from dfplayer import DFRobotPlayer, GD3200Player, PlayerStatus

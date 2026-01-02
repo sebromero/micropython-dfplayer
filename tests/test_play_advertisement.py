@@ -1,3 +1,9 @@
+"""
+To run this test, make sure you have the following files on the SD card:
+
+- ADVERT/0001.mp3
+"""
+
 from machine import UART, Pin
 from time import sleep_ms
 from dfplayer import GD3200Player, PlayerStatus
