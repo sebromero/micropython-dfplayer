@@ -14,6 +14,7 @@ DFPLAYER_MAX_VOLUME = const(30)  # Maximum supported volume.
 DFPLAYER_MAX_FOLDER = const(99)  # Highest supported folder number.
 DFPLAYER_MAX_FILE = const(255)  # Highest supported file number in the "MP3" folder.
 DFPLAYER_MAX_MP3_FILE = const(65536)  # Highest supported file number in the "MP3" folder.
+DFPLAYER_MAX_ADVERT_FILE = const(65536)  # Highest supported file number in the "ADVERT" folder.
 
 # Constants used in frames sent to the DFPlayer Mini
 DFPLAYER_FRAME_SIZE = const(10)  # Size of a frame sent to the DFPlayer Mini.
@@ -66,6 +67,7 @@ DFPLAYER_RESPONSE_ACK = const(0x41)  # Last command succeeded.
 
 # Error codes sent as parameter of error messages
 DFPLAYER_ERROR_NO_SUCH_FILE = const(0x06)  # File/folder selected for playback (command 0x06) does not exist.
+DFPLAYER_ERROR_INSERTION_CMD = const(0x07)  # inserting operation only can be donewhen a track is being played
 
 # Common Commands
 DFPLAYER_CMD_NEXT = const(0x01)  # Start playing the next song.
@@ -82,6 +84,7 @@ DFPLAYER_CMD_PLAY = const(0x0d)  # Start playing the selected file.
 DFPLAYER_CMD_PAUSE = const(0x0e)  # Pause the playback.
 DFPLAYER_CMD_PLAY_FILE = const(0x0f)  # Play the given file (1-255) in the given folder (1-99)
 DFPLAYER_CMD_PLAY_FROM_MP3 = const(0x12)  # Play the given file (1-9999) from the folder "MP3"
+DFPLAYER_CMD_PLAY_ADVERT = const(0x13)  # Play the given file (1-9999) from the folder "ADVERT", resume current playback afterwards.
 DFPLAYER_CMD_STOP = const(0x16)  # Stop playback.
 DFPLAYER_CMD_MUTE = const(0x1a)  # Mute/unmute the audio output. 0=unmute, 1=mute
 DFPLAYER_CMD_REPEAT_ALL = const(0x11)  # Start/stop repeat-playing the whole source. 1=loop 0=stop
@@ -282,12 +285,14 @@ class DFPlayer:
     def _handle_error_response(self, response_data):
         if response_data == DFPLAYER_ERROR_NO_SUCH_FILE:
             raise RuntimeError("No such file or folder")
-        if response_data == DFPLAYER_ERROR_BUSY:
-            raise RuntimeError("DFPlayer is busy")
-        if response_data == DFPLAYER_ERROR_FRAME:
-            raise RuntimeError("DFPlayer received incomplete frame")
-        if response_data == DFPLAYER_ERROR_FCS:
-            raise RuntimeError("DFPlayer received corrupted frame (FCS mismatch)")
+        # if response_data == DFPLAYER_ERROR_BUSY:
+        #     raise RuntimeError("DFPlayer is busy")
+        # if response_data == DFPLAYER_ERROR_FRAME:
+        #     raise RuntimeError("DFPlayer received incomplete frame")
+        # if response_data == DFPLAYER_ERROR_FCS:
+        #     raise RuntimeError("DFPlayer received corrupted frame (FCS mismatch)")
+        if response_data == DFPLAYER_ERROR_INSERTION_CMD:
+            raise RuntimeError("Insertion operation can only be done when a track is being played")
         raise RuntimeError(f"Unknown error. Data: {hex(response_data)}")          
 
     def _exec_command(self, command, data_high = 0x0, data_low = 0x0, ack = True, is_query = False, check_error = False):
@@ -389,6 +394,16 @@ class DFPlayer:
         if track_number < 0 or track_number > DFPLAYER_MAX_MP3_FILE:
             raise ValueError("Track number must be between 0 and 9999")
         self._exec_command(DFPLAYER_CMD_PLAY_FROM_MP3, track_number >> 8, track_number & 0xFF, check_error=True)
+
+    def play_from_advert_folder(self, track_number):
+        """
+        Play the given track number from the "ADVERT" folder.
+        On DFRobot's DFPlayer: Raises DFPLAYER_ERROR_INSERTION_CMD if playback is not active.
+        On MH2024K/GD3200: Resumes playback afterwards no matter if playback was active or not.
+        """
+        if track_number < 0 or track_number > DFPLAYER_MAX_ADVERT_FILE:
+            raise ValueError("Track number must be between 0 and 9999")
+        self._exec_command(DFPLAYER_CMD_PLAY_ADVERT, track_number >> 8, track_number & 0xFF, check_error=True)
 
     def repeat_all(self, repeat: bool = True):
         """

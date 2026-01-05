@@ -1,10 +1,8 @@
 from micropython import const
 from .dfplayer import DFPlayer
 
-DFPLAYER_MAX_ADVERT_FILE = const(65536)  # Highest supported file number in the "ADVERT" folder.
 
 DFPLAYER_CMD_SINGLE_TRACK_LOOP = const(0x08)  # Loops single track (0-65535)
-DFPLAYER_CMD_PLAY_ADVERT = const(0x13)  # Play the given file (1-9999) from the folder "ADVERT", resume current playback afterwards.
 DFPLAYER_CMD_FILES_IN_FOLDER = const(0x4e)  # Get the number of files in the current folder.
 DFPLAYER_CMD_FOLDERS = const(0x4f)  # Get the number of folders.
 
@@ -67,16 +65,6 @@ class MH2024KPlayer(DFPlayer):
         The index is the file number from the flattened file list sorted alphabetically.
         """
         self._exec_command(DFPLAYER_CMD_SINGLE_TRACK_LOOP, track_id >> 8, track_id & 0xFF, check_error=True)
-
-    def play_from_advert_folder(self, track_number):
-        """
-        Play the given track number from the "ADVERT" folder.
-        Resumes playback afterwards no matter if playback was active or not.
-        """
-        if track_number < 0 or track_number > DFPLAYER_MAX_ADVERT_FILE:
-            raise ValueError("Track number must be between 0 and 9999")
-        self._exec_command(DFPLAYER_CMD_PLAY_ADVERT, track_number >> 8, track_number & 0xFF, check_error=True)
-
     # TODO: Doesn't seem to work on MH2024K
     # Returns no data
     @property
