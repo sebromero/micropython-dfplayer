@@ -3,7 +3,7 @@ from .dfplayer import DFPlayer
 
 DFPLAYER_CMD_STANDBY_EXIT = const(0x0b)  # Exit low power mode, back to normal mode.
 DFPLAYER_CMD_SET_PLAYBACK_MODE = const(0x08)  # Set the playback mode. (0-3)
-# DFPLAYER_CMD_VOLUME_ADJUST_SET = const(0x10) # TODO
+DFPLAYER_CMD_VOLUME_ADJUST_SET = const(0x10) # Set the DAC gain. (0-31)
 
 DFPLAYER_CMD_GET_FILES_SDCARD = const(0x47)  # Get the total number of files on the SD card.
 DFPLAYER_CMD_GET_FILES_USB = const(0x48)  # Get the total number of files on USB storage.
@@ -73,3 +73,18 @@ class DFRobotPlayer(DFPlayer):
         if mode < 0 or mode > 3:
             raise ValueError("Playback mode must be between 0 and 3")
         self._exec_command(DFPLAYER_CMD_SET_PLAYBACK_MODE, 0x00, mode)
+
+    # TODO: Doesn't seem to work on DFROBOT|LISP3
+    # Device acknowledges the command but gain doesn't change
+    def set_dac_gain(self, enabled: bool, gain: int = 31):
+        """
+        Set the DAC gain (0 - 31). This adjusts the output volume level.
+        When 'enabled' is False, the gain setting is ignored and the DAC uses default gain
+        """
+        if gain < 0 or gain > 31:
+            raise ValueError("DAC gain must be between 0 and 31")
+        # HD-byte value, 0x01=enable gain, 0x00=disable gain
+        # LD-byte value, 0..31=gain
+        self._exec_command(DFPLAYER_CMD_VOLUME_ADJUST_SET, 0x01 if enabled else 0x00, gain)
+
+    
