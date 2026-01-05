@@ -1,8 +1,6 @@
 from micropython import const
 from .dfplayer import DFPlayer
 
-
-DFPLAYER_CMD_SINGLE_TRACK_LOOP = const(0x08)  # Loops single track (0-65535)
 DFPLAYER_CMD_FILES_IN_FOLDER = const(0x4e)  # Get the number of files in the current folder.
 DFPLAYER_CMD_FOLDERS = const(0x4f)  # Get the number of folders.
 
@@ -59,12 +57,6 @@ class MH2024KPlayer(DFPlayer):
 
     # Additional commands
 
-    def loop_track(self, track_id):
-        """
-        Loop the given track ID (0-65535) indefinitely. Starts playback.
-        The index is the file number from the flattened file list sorted alphabetically.
-        """
-        self._exec_command(DFPLAYER_CMD_SINGLE_TRACK_LOOP, track_id >> 8, track_id & 0xFF, check_error=True)
     # TODO: Doesn't seem to work on MH2024K
     # Returns no data
     @property

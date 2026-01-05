@@ -77,6 +77,7 @@ DFPLAYER_CMD_VOLUME_INC = const(0x04)  # Increase volume.
 DFPLAYER_CMD_VOLUME_DEC = const(0x05)  # Decrease volume.
 DFPLAYER_CMD_SET_VOLUME = const(0x06)  # Set the volume to the given level. (0-30)
 DFPLAYER_CMD_SET_EQUALIZER = const(0x07)  # Set the equalizer to the given setting. (0-5)
+DFPLAYER_CMD_SINGLE_TRACK_LOOP = const(0x08)  # Loops single track (0-65535) (Also on DFRobot's DFPlayer)
 DFPLAYER_CMD_SET_SOURCE = const(0x09)  # Set the source to play files from.
 DFPLAYER_CMD_STANDBY_ENTER = const(0x0a)  # Enter low power mode.
 DFPLAYER_CMD_RESET = const(0x0c)  # Reset the DFPlayer Mini.
@@ -404,6 +405,14 @@ class DFPlayer:
         if track_number < 0 or track_number > DFPLAYER_MAX_ADVERT_FILE:
             raise ValueError("Track number must be between 0 and 9999")
         self._exec_command(DFPLAYER_CMD_PLAY_ADVERT, track_number >> 8, track_number & 0xFF, check_error=True)
+
+    def loop_track(self, track_id):
+        """
+        Loop the given track ID (0-65535) indefinitely. Starts playback.
+        The index is the file number from the flattened file list sorted chronologically.
+        It's the same as play_track_by_number but enables single track loop mode.
+        """
+        self._exec_command(DFPLAYER_CMD_SINGLE_TRACK_LOOP, track_id >> 8, track_id & 0xFF, check_error=True)
 
     def repeat_all(self, repeat: bool = True):
         """
