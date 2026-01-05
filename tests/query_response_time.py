@@ -1,6 +1,6 @@
 from machine import UART, Pin
 from time import sleep_ms
-from dfplayer import DFRobotPlayer, GD3200Player
+from dfplayer import DFRobotPlayer, MH2024KPlayer
 
 from dfplayer.dfplayer import DFPLAYER_CMD_GET_VOLUME, DFPLAYER_CMD_GET_STATUS
 from dfplayer.dfplayer import DFPLAYER_CMD_GET_VERSION, DFPLAYER_CMD_GET_EQUALIZER
@@ -8,7 +8,7 @@ from dfplayer.dfplayer import DFPLAYER_CMD_GET_PLAYBACK_MODE
 
 uart1 = UART(0, tx=Pin("TX"), rx=Pin("RX"))
 uart2 = UART(1, tx=Pin("D9"), rx=Pin("D8"))
-gdplayer = GD3200Player(uart1)
+mhplayer = MH2024KPlayer(uart1)
 dfrplayer = DFRobotPlayer(uart2)
 
 def get_response_time(player, command, timeout_ms=5000) -> int | None:  
@@ -37,7 +37,7 @@ def get_response_time(player, command, timeout_ms=5000) -> int | None:
             end_time = time.ticks_ms()
             return time.ticks_diff(end_time, start_time)
         
-players = [gdplayer, dfrplayer]
+players = [mhplayer, dfrplayer]
 for player in players:
     print(f"Running test for {player.__class__.__name__}")
     response_time_volume = get_response_time(player, DFPLAYER_CMD_GET_VOLUME)

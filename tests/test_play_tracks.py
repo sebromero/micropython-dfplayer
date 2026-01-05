@@ -11,13 +11,13 @@ In the root:
 """
 from machine import UART, Pin
 from time import sleep_ms
-from dfplayer import DFRobotPlayer, GD3200Player, PlayerStatus
+from dfplayer import DFRobotPlayer, MH2024KPlayer, PlayerStatus
 
 PLAY_WAIT_TIME_MS = 1000
 
 uart1 = UART(0, tx=Pin("TX"), rx=Pin("RX"))
 uart2 = UART(1, tx=Pin("D9"), rx=Pin("D8"))
-gdplayer = GD3200Player(uart1)
+mhplayer = MH2024KPlayer(uart1)
 dfrplayer = DFRobotPlayer(uart2)
 
 
@@ -58,5 +58,5 @@ def run_tests(player):
 
     player.stop()
 
-run_tests(gdplayer)
+run_tests(mhplayer)
 run_tests(dfrplayer)

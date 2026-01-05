@@ -6,12 +6,12 @@ To run this test, make sure you have the following files on the SD card:
 
 from machine import UART, Pin
 from time import sleep_ms
-from dfplayer import GD3200Player, PlayerStatus
+from dfplayer import MH2024KPlayer, PlayerStatus
 
 PLAY_WAIT_TIME_MS = 1000
 
 uart1 = UART(0, tx=Pin("TX"), rx=Pin("RX"))
-gdplayer = GD3200Player(uart1)
+mhplayer = MH2024K(uart1)
 
 
 def run_tests(player):
@@ -40,4 +40,4 @@ def run_tests(player):
 
     player.stop()
 
-run_tests(gdplayer)
+run_tests(mhplayer)

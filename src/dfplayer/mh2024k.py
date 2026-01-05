@@ -29,7 +29,7 @@ DFPLAYER_ERROR_FCS = const(0x04)  # Frame check sequence of last frame didn't ma
 #     SD_CARD = 2
 #     FLASH = 4
 
-class GD3200Player(DFPlayer):
+class MH2024KPlayer(DFPlayer):
 
     # OVERRIDES
 
@@ -46,7 +46,7 @@ class GD3200Player(DFPlayer):
 
     def repeat_all(self, repeat):
         # TODO: Further investigate this
-        raise NotImplementedError("GD3200Player should support repeat all but it's broken.")
+        raise NotImplementedError("MH2024KPlayer should support repeat all but it's broken.")
 
     # Additional commands
 

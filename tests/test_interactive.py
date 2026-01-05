@@ -1,11 +1,11 @@
 from machine import UART, Pin
 from time import sleep_ms
-from dfplayer import DFRobotPlayer, GD3200Player
+from dfplayer import DFRobotPlayer, MH2024KPlayer
 
 uart1 = UART(0, tx=Pin("TX"), rx=Pin("RX"))
 uart2 = UART(1, tx=Pin("D9"), rx=Pin("D8"))
-gdplayer = GD3200Player(uart1)
-gdplayer.volume = 50
+mhplayer = MH2024KPlayer(uart1)
+mhplayer.volume = 50
 
 dfrplayer = DFRobotPlayer(uart2)
 dfrplayer.volume = 50
