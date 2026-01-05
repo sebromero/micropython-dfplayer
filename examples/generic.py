@@ -55,7 +55,7 @@ player.next_track()
 sleep_ms(10000)
 
 print("Playing track 2 from folder 1")
-player.play_track(1, 2)
+player.play_folder(1, 2)
 sleep_ms(10000)
 
 print("Playing advertisement 1 from advert folder")
