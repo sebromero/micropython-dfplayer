@@ -5,19 +5,15 @@ DFPLAYER_MAX_ADVERT_FILE = const(65536)  # Highest supported file number in the 
 
 DFPLAYER_CMD_SINGLE_TRACK_LOOP = const(0x08)  # Loops single track (0-65535)
 DFPLAYER_CMD_PLAY_ADVERT = const(0x13)  # Play the given file (1-9999) from the folder "ADVERT", resume current playback afterwards.
+DFPLAYER_CMD_FILES_IN_FOLDER = const(0x4e)  # Get the number of files in the current folder.
+DFPLAYER_CMD_FOLDERS = const(0x4f)  # Get the number of folders.
+
 # DFPLAYER_CMD_FILE_LARGE = const(0x14)  # Play the given file (1-4095) in the given folder (1-15).
 # DFPLAYER_CMD_ABORT_ADVERT = const(0x15)  # Abort advert playback and resume current playback.
 # DFPLAYER_CMD_REPEAT_FOLDER = const(0x17)  # Start repeat-playing the given folder (1-99)
 # DFPLAYER_CMD_RANDOM = const(0x18)  # Start playing all files in random order.
 # DFPLAYER_CMD_REPEAT = const(0x19)  # 0 = repeat currently played file, 1 = stop repeating
 # DFPLAYER_CMD_ADVERT_FOLDER = const(0x25) # Set the advert folder 1-9
-
-# DFPLAYER_CMD_FILES_USB = const(0x47)  # Get the total number of files on USB storage.
-# DFPLAYER_CMD_FILES_SDCARD = const(0x48)  # Get the total number of files on the SD card.
-# DFPLAYER_CMD_FILENO_USB = const(0x4b)  # Get the currently select file number on the USB storage.
-# DFPLAYER_CMD_FILENO_SDCARD = const(0x4c)  # Get the currently select file number on the SD-Card.    
-# DFPLAYER_CMD_FILES_IN_FOLDER = const(0x4e)  # Get the number of files in the current folder.
-# DFPLAYER_CMD_FOLDERS = const(0x4f)  # Get the number of folders.
 
 # Error codes sent as parameter of error messages
 # DFPLAYER_ERROR_BUSY = const(0x01)  # Module is busy.
@@ -81,3 +77,18 @@ class MH2024KPlayer(DFPlayer):
             raise ValueError("Track number must be between 0 and 9999")
         self._exec_command(DFPLAYER_CMD_PLAY_ADVERT, track_number >> 8, track_number & 0xFF, check_error=True)
 
+    # TODO: Doesn't seem to work on MH2024K
+    # Returns no data
+    @property
+    def folder_count(self) -> int | None:
+        """Return the number of folders on the current storage device."""
+        response = self._exec_command(DFPLAYER_CMD_FOLDERS, is_query=True)
+        return response.data if response else None
+    
+    # TODO: Doesn't seem to work on MH2024K
+    # Returns always 0
+    @property
+    def file_count_in_current_folder(self) -> int | None:
+        """Return the number of files in the current folder."""
+        response = self._exec_command(DFPLAYER_CMD_FILES_IN_FOLDER, is_query=True)
+        return response.data if response else None
