@@ -403,9 +403,12 @@ class DFPlayer:
         self._exec_command(DFPLAYER_CMD_PLAY_FILE, folder, track, check_error=True)
 
     def play_track_by_number(self, track_number):
-        """Play the given track number from the flattened file list."""
-        if track_number < 1:
-            raise ValueError("Track number must be greater than or equal to 1")
+        """
+        Play the given track number from the flattened file list.
+        The order of tracks is determined by the underlying file table.
+        """
+        if track_number < 1 or track_number > 65535:
+            raise ValueError("Track number must be between 1 and 65535")
         self._exec_command(DFPLAYER_CMD_PLAY_TRACK, track_number >> 8, track_number & 0xFF, check_error=True)
 
     def play_from_mp3_folder(self, track_number):
