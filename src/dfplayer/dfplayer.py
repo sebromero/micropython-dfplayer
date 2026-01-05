@@ -41,6 +41,7 @@ DFPLAYER_NOTIFY_EJECT = const(0x3b)  # A USB storage device or an SD card was ej
 DFPLAYER_NOTIFY_DONE_USB = const(0x3c)  # Completed playing the indicated track from USB storage.
 DFPLAYER_NOTIFY_DONE_SDCARD = const(0x3d)  # Completed playing the indicated track from SD card.
 DFPLAYER_NOTIFY_DONE_FLASH = const(0x3e)  # Completed playing the indicated track from flash.
+DFPLAYER_NOTIFY_INIT = const(0x3f)  # Ready notification after initialization.
 
 # Device identifiers in insert/eject notifications
 DFPLAYER_DEVICE_USB = const(0x01)  # A USB storage device was inserted/ejected.
@@ -89,9 +90,8 @@ DFPLAYER_CMD_GET_VOLUME = const(0x43)  # Retrieve the current volume.
 DFPLAYER_CMD_GET_EQUALIZER = const(0x44)  # Retrieve the current equalizer setting.
 DFPLAYER_CMD_GET_PLAYBACK_MODE = const(0x45)  # Retrieve the current playback mode.
 DFPLAYER_CMD_GET_VERSION = const(0x46)  # Retrieve the device's software version.
-# DFPLAYER_CMD_FILES_FLASH = const(0x49)  # Get the total number of files on the internal flash.
-# DFPLAYER_CMD_FILENO_FLASH = const(0x4d)  # Get the currently select file number on the NOR flash.
-DFPLAYER_CMD_INIT = const(0x3f)  # TODO e.g. get online devices
+DFPLAYER_CMD_FILES_FLASH = const(0x49)  # Get the total number of files on the internal flash.
+DFPLAYER_CMD_FILENO_FLASH = const(0x4d)  # Get the currently select file number on the NOR flash.
 
 class Frame():
     def __init__(self, raw_data):
@@ -388,16 +388,19 @@ class DFPlayer:
             raise ValueError("Track number must be between 0 and 9999")
         self._exec_command(DFPLAYER_CMD_PLAY_FROM_MP3, track_number >> 8, track_number & 0xFF, check_error=True)
 
-    def repeat_all(self, repeat: bool):
+    def repeat_all(self, repeat: bool = True):
         """
         Starts repeat playback of all files in the root directory in chronological order.
         If repeat is False, stops repeat playback and stops playback.
+
+        Parameters:
+            repeat (bool): True (default) to enable repeat all, False to disable.
         """
         value = 0x01 if repeat else 0x00
         self._exec_command(DFPLAYER_CMD_REPEAT_ALL, 0x00, value)
 
     def enter_standby(self):
-        """Enter or exit standby mode."""
+        """Enter standby mode."""
         self._exec_command(DFPLAYER_CMD_STANDBY_ENTER)
 
     @property
@@ -435,10 +438,7 @@ class DFPlayer:
     @property
     def volume(self) -> int | None:
         response = self._exec_command(DFPLAYER_CMD_GET_VOLUME, is_query=True)
-        if response is None:
-            return None
-        response_data = response.data
-        return int(response_data / DFPLAYER_MAX_VOLUME * 100)
+        return int(response.data / DFPLAYER_MAX_VOLUME * 100) if response else None
 
     @volume.setter
     def volume(self, value : int):
@@ -477,9 +477,7 @@ class DFPlayer:
     def software_version(self) -> int | None:
         """Return the DFPlayer software version as a number."""
         response = self._exec_command(DFPLAYER_CMD_GET_VERSION, is_query=True)
-        if response is None:
-            return None
-        return response.data
+        return response.data if response else None
     
     @property
     def playback_mode(self) -> int | None:
@@ -488,7 +486,16 @@ class DFPlayer:
         The meaning of the return values is device-dependent.
         """
         response = self._exec_command(DFPLAYER_CMD_GET_PLAYBACK_MODE, is_query=True)
-        if response is None:
-            return None
-        return response.data
+        return response.data if response else None
     
+    @property
+    def file_count_flash(self) -> int | None:
+        """Return the total number of files on the internal flash storage."""
+        response = self._exec_command(DFPLAYER_CMD_FILES_FLASH, is_query=True)
+        return response.data if response else None
+    
+    @property
+    def current_file_number_flash(self) -> int | None:
+        """Return the currently selected file number on the internal flash storage."""
+        response = self._exec_command(DFPLAYER_CMD_FILENO_FLASH, is_query=True)
+        return response.data if response else None
