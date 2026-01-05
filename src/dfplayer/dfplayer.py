@@ -394,7 +394,7 @@ class DFPlayer:
     def decrease_volume(self):
         self._exec_command(DFPLAYER_CMD_VOLUME_DEC)
     
-    def play_folder(self, folder, track = 1):
+    def play_track(self, folder, track):
         """Play the given track number from the given folder."""
         if folder < 1 or folder > DFPLAYER_MAX_FOLDER:
             raise ValueError("Folder number must be between 1 and 99")
