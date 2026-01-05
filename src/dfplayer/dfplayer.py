@@ -49,11 +49,11 @@ DFPLAYER_DEVICE_USB = const(0x01)  # A USB storage device was inserted/ejected.
 DFPLAYER_DEVICE_SDCARD = const(0x02)  # An SD card was inserted/ejected.
 
 # Bitmasks identifying the playback sources in the ready notification
-#DFPLAYER_MASK_USB = const(0x01)  # USB stick is connected.
-#DFPLAYER_MASK_SDCARD = const(0x02)  # SD-Card is connected.
-#DFPLAYER_MASK_USB_SDCARD = const(0x03)  # Both USB stick and SD-Card are connected.
-#DFPLAYER_MASK_PC = const(0x04)  # Unclear, has something to do with debugging.
-#DFPLAYER_MASK_FLASH = const(0x08)  # NOR flash is connected.
+DFPLAYER_SOURCE_USB = const(0x01)  # USB stick is connected.
+DFPLAYER_SOURCE_SDCARD = const(0x02)  # SD-Card is connected.
+DFPLAYER_SOURCE_USB_SDCARD = const(0x03)  # Both USB stick and SD-Card are connected.
+DFPLAYER_SOURCE_PC = const(0x04)  # Unclear, has something to do with debugging.
+DFPLAYER_SOURCE_FLASH = const(0x08)  # NOR flash is connected.
 
 # Status bitmasks
 DFPLAYER_STATUS_MASK = const(0x0f)  # Use bits 0-3 to get the status from a response code.
@@ -96,6 +96,7 @@ DFPLAYER_CMD_REPEAT_ALL = const(0x11)  # Start/stop repeat-playing the whole sou
 DFPLAYER_CMD_PLAY_FROM_MP3 = const(0x12)  # Play the given file (1-9999) from the folder "MP3"
 DFPLAYER_CMD_PLAY_ADVERT = const(0x13)  # Play the given file (1-9999) from the folder "ADVERT", resume current playback afterwards.
 DFPLAYER_CMD_STOP = const(0x16)  # Stop playback.
+DFPLAYER_CMD_REPEAT_FOLDER = const(0x17)  # Start repeat-playing the given folder (1-99)
 DFPLAYER_CMD_MUTE = const(0x1a)  # Mute/unmute the audio output. 0=unmute, 1=mute
 DFPLAYER_CMD_GET_STATUS = const(0x42)  # Retrieve the current status.
 DFPLAYER_CMD_GET_VOLUME = const(0x43)  # Retrieve the current volume.
@@ -104,7 +105,7 @@ DFPLAYER_CMD_GET_PLAYBACK_MODE = const(0x45)  # Retrieve the current playback mo
 DFPLAYER_CMD_GET_VERSION = const(0x46)  # Retrieve the device's software version.
 
 # Commands to query files
-# Warning: The documentation of DFRobot's DFPlayer mixes up those commands
+# Warning: The documentation of DFRobot's DFPlayer DFROBOT|LISP3 mixes up those commands
 # It follows the documentation of the MH2024K/GD3200 instead
 DFPLAYER_CMD_FILES_USB = const(0x47)  # Get the total number of files on USB storage.
 DFPLAYER_CMD_FILES_SDCARD = const(0x48)  # Get the total number of files on the SD card.
@@ -159,9 +160,42 @@ class FrameReader():
     def __init__(self, uart):
         self.uart = uart
         self._frames = deque([], 10)  # Store up to 10 frames
+        self._on_notification = None
         # TODO: Consider using IRQ on uart RX
         # On ESP32 it uses Timer(0) which makes it unavailable for other uses
         #uart.irq(handler= lambda e: print("UART IRQ fired!"), trigger=UART.IRQ_RXIDLE)
+
+    def _read_frame(self, timeout_ms = 1000) -> Frame | None:
+        if self.uart.any() == 0:
+            # No data available
+            return None
+
+        start_time = ticks_ms()
+
+        while True:
+            if timeout_ms is not None and (ticks_ms() - start_time) >= timeout_ms:
+                return None
+            
+            next_byte = self.uart.read(1)
+            if next_byte is None:
+                sleep_ms(10)
+                continue
+            if next_byte[0] == DFPLAYER_START:
+                break
+            else:
+                print(f"Discarding spurious byte: {hex(next_byte[0])}")
+
+        # Wait for the rest of the frame
+        while self.uart.any() < DFPLAYER_FRAME_SIZE - 1:
+            if timeout_ms is not None and (ticks_ms() - start_time) >= timeout_ms:
+                return None
+            sleep_ms(10)
+
+        data = self.uart.read(DFPLAYER_FRAME_SIZE - 1)  # Read the rest of the frame
+        return Frame(bytes([DFPLAYER_START]) + data)
+
+    def set_notification_callback(self, callback : callable):
+        self._on_notification = callback
 
     def clear(self):
         """Clear all frames from the internal buffer."""
@@ -198,7 +232,9 @@ class FrameReader():
                     continue
                 return frames_added
             if f.is_notification:
-                print(f"Skipping notification code: {hex(f.command)} data: {hex(f.data)}")
+                if self._on_notification:
+                    self._on_notification(f)
+                # Notifications are not stored in the buffer
                 continue
             self._frames.append(f)
             frames_added += 1
@@ -215,35 +251,6 @@ class FrameReader():
         if len(self._frames) == 0:
             return None
         return self._frames[0]
-
-    def _read_frame(self, timeout_ms = 1000) -> Frame | None:
-        if self.uart.any() == 0:
-            # No data available
-            return None
-
-        start_time = ticks_ms()
-
-        while True:
-            if timeout_ms is not None and (ticks_ms() - start_time) >= timeout_ms:
-                return None
-            
-            next_byte = self.uart.read(1)
-            if next_byte is None:
-                sleep_ms(10)
-                continue
-            if next_byte[0] == DFPLAYER_START:
-                break
-            else:
-                print(f"Discarding spurious byte: {hex(next_byte[0])}")
-
-        # Wait for the rest of the frame
-        while self.uart.any() < DFPLAYER_FRAME_SIZE - 1:
-            if timeout_ms is not None and (ticks_ms() - start_time) >= timeout_ms:
-                return None
-            sleep_ms(10)
-
-        data = self.uart.read(DFPLAYER_FRAME_SIZE - 1)  # Read the rest of the frame
-        return Frame(bytes([DFPLAYER_START]) + data)
 
 class PlayerStatus:
     # Arbitrary values representing player status
@@ -271,6 +278,23 @@ class DFPlayer:
             busy_pin.irq(trigger=Pin.IRQ_RISING | Pin.IRQ_FALLING, handler=self._on_busy_pin_change)
         
         self._frame_reader = FrameReader(uart)
+        self._frame_reader.set_notification_callback(self._handle_notification)
+
+        self._on_track_finished = None
+        self._on_media_inserted = None
+        self._on_media_ejected = None
+        self._on_device_ready = None
+
+    def _handle_notification(self, frame):
+        cmd = frame.command
+        if cmd == DFPLAYER_NOTIFY_INIT:
+            self._on_device_ready(frame.data) if self._on_device_ready else None
+        elif cmd == DFPLAYER_NOTIFY_INSERT:
+            self._on_media_inserted(frame.data) if self._on_media_inserted else None
+        elif cmd == DFPLAYER_NOTIFY_EJECT:
+            self._on_media_ejected(frame.data) if self._on_media_ejected else None
+        elif cmd in [DFPLAYER_NOTIFY_DONE_USB, DFPLAYER_NOTIFY_DONE_SDCARD, DFPLAYER_NOTIFY_DONE_FLASH]:            
+            self._on_track_finished(frame.data) if self._on_track_finished else None
 
     def _on_busy_pin_change(self, pin):
          # High level during playback; Low in pause status and module sleep
@@ -358,6 +382,26 @@ class DFPlayer:
 
         return cmd_response
 
+    def on_track_finished(self, callback):
+        """Register a callback to be called when a track finishes playing."""
+        self._on_track_finished = callback
+
+    def on_media_inserted(self, callback):
+        """Register a callback to be called when media is inserted."""
+        self._on_media_inserted = callback
+
+    def on_media_ejected(self, callback):
+        """Register a callback to be called when media is ejected."""
+        self._on_media_ejected = callback
+
+    def on_device_ready(self, callback):
+        """Register a callback to be called when the device is ready after initialization."""
+        self._on_device_ready = callback
+
+    def update(self):
+        """Update the internal frame reader to process incoming frames."""
+        self._frame_reader.update()
+
     def reset(self):
         """Reset the DFPlayer."""
         self._exec_command(DFPLAYER_CMD_RESET)
@@ -437,7 +481,7 @@ class DFPlayer:
 
     def repeat_all(self, repeat: bool = True):
         """
-        Starts repeat playback of all files in the root directory in chronological order.
+        Starts repeat playback of all files from the flattened file list in chronological order.
         If repeat is False, stops repeat playback and stops playback.
 
         Parameters:
@@ -445,6 +489,17 @@ class DFPlayer:
         """
         value = 0x01 if repeat else 0x00
         self._exec_command(DFPLAYER_CMD_REPEAT_ALL, 0x00, value)
+
+    def repeat_folder(self, folder: int):
+        """
+        Start repeat-playing the given folder (1-99)
+        The order of tracks is variant specific.
+        On DFROBOT|LISP3, tracks are played in alphanumeric order.
+        On MH2024K, tracks are played in the order they were added to the file table.
+        """
+        if folder < 1 or folder > DFPLAYER_MAX_FOLDER:
+            raise ValueError("Folder number must be between 1 and 99")
+        self._exec_command(DFPLAYER_CMD_REPEAT_FOLDER, 0x0, folder)
 
     def enter_standby(self):
         """Enter standby mode."""

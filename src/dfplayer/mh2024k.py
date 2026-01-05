@@ -6,7 +6,6 @@ DFPLAYER_CMD_FOLDERS = const(0x4f)  # Get the number of folders.
 
 # DFPLAYER_CMD_FILE_LARGE = const(0x14)  # Play the given file (1-4095) in the given folder (1-15).
 # DFPLAYER_CMD_ABORT_ADVERT = const(0x15)  # Abort advert playback and resume current playback.
-# DFPLAYER_CMD_REPEAT_FOLDER = const(0x17)  # Start repeat-playing the given folder (1-99)
 # DFPLAYER_CMD_RANDOM = const(0x18)  # Start playing all files in random order.
 # DFPLAYER_CMD_REPEAT = const(0x19)  # 0 = repeat currently played file, 1 = stop repeating
 # DFPLAYER_CMD_ADVERT_FOLDER = const(0x25) # Set the advert folder 1-9
@@ -21,7 +20,7 @@ class MH2024KPlayer(DFPlayer):
     # OVERRIDES
 
     def repeat_all(self, repeat):
-        # TODO: Further investigate this
+        # Device seems to acknowledge the command but doesn't do anything
         raise NotImplementedError("MH2024KPlayer should support repeat all but it's broken.")
 
     # TODO: This needs testing
