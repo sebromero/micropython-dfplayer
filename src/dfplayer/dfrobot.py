@@ -1,5 +1,5 @@
 from micropython import const
-from .dfplayer import DFPlayer, DFPLAYER_CMD_PLAY_TRACK, DFPLAYER_CMD_SET_SOURCE
+from .dfplayer import DFPlayer
 
 DFPLAYER_CMD_STANDBY_EXIT = const(0x0b)  # Exit low power mode, back to normal mode.
 DFPLAYER_CMD_SET_PLAYBACK_MODE = const(0x08)  # Set the playback mode. (0-3)
@@ -15,12 +15,12 @@ DFPLAYER_CMD_FILENO_USB = const(0x4c)  # Get the currently select file number on
 # DFPLAYER_ERROR_FRAME = const(0x01)  # Received incomplete frame.
 # DFPLAYER_ERROR_FCS = const(0x02)  # Frame check sequence of last frame didn't match.
 
-# class PlaybackSource:
-#     USB = 0
-#     SD_CARD = 1
-#     AUX = 2
-#     SLEEP = 3
-#     FLASH = 4
+class PlaybackSource:
+    USB = 0
+    SD_CARD = 1
+    AUX = 2
+    SLEEP = 3
+    FLASH = 4
 
 # class PlaybackMode:
 #     REPEAT = 0
@@ -44,6 +44,17 @@ class DFRobotPlayer(DFPlayer):
             raise ValueError("Track number must be between 0 and 2999")            
         super().play_track_by_number(track_number)
 
+    # TODO: This needs testing
+    def set_playback_source(self, source : int):
+        """
+        Set the playback source.
+        0 = U-disk, 1 = SD card, 2 = AUX, 3 = SLEEP, 4 = FLASH
+        """
+        if source < 0 or source > 4:
+            raise ValueError("Playback source must be between 0 and 4")
+        
+        super().set_playback_source(source)
+
     # Additional commands
 
     # TODO: Doesn't seem to work on DFROBOT|LISP3
@@ -51,16 +62,6 @@ class DFRobotPlayer(DFPlayer):
     def exit_standby(self):
         """Exit low power mode, back to normal mode."""
         self._exec_command(DFPLAYER_CMD_STANDBY_EXIT)
-
-    # def set_playback_source(self, source : PlaybackSource):
-    #     """
-    #     Set the playback source.
-    #     0 = U-disk, 1 = SD card, 2 = AUX, 3 = SLEEP, 4 = FLASH
-    #     """
-    #     if source < 0 or source > 4:
-    #         raise ValueError("Playback source must be between 0 and 4")
-    #     # According to the datasheet, this command takes 200ms
-    #     self._exec_command(DFPLAYER_CMD_SET_SOURCE, 0x00, source, 200)
 
     # TODO: Doesn't seem to work on DFROBOT|LISP3
     # Device goes crazy after sending this command, sending random data

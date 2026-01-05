@@ -1,5 +1,5 @@
 from micropython import const
-from .dfplayer import DFPlayer, DFPLAYER_CMD_SET_SOURCE
+from .dfplayer import DFPlayer
 
 DFPLAYER_MAX_ADVERT_FILE = const(65536)  # Highest supported file number in the "ADVERT" folder.
 
@@ -24,10 +24,10 @@ DFPLAYER_CMD_PLAY_ADVERT = const(0x13)  # Play the given file (1-9999) from the 
 # DFPLAYER_ERROR_FRAME = const(0x03)  # Received incomplete frame.
 # DFPLAYER_ERROR_FCS = const(0x04)  # Frame check sequence of last frame didn't match.
 
-# class PlaybackSource:
-#     USB = 1
-#     SD_CARD = 2
-#     FLASH = 4
+class PlaybackSource:
+    USB = 1
+    SD_CARD = 2
+    FLASH = 4
 
 class MH2024KPlayer(DFPlayer):
 
@@ -47,6 +47,17 @@ class MH2024KPlayer(DFPlayer):
     def repeat_all(self, repeat):
         # TODO: Further investigate this
         raise NotImplementedError("MH2024KPlayer should support repeat all but it's broken.")
+
+    # TODO: This needs testing
+    def set_playback_source(self, source : int):
+        """
+        Set the playback source.
+        1: USB, 2: TF Card, 4: Flash
+        """
+        if source < 1 or source > 4:
+            raise ValueError("Playback source must be between 1 and 4")
+        
+        super().set_playback_source(source)
 
     @property
     def software_version(self) -> int | None:
@@ -70,14 +81,3 @@ class MH2024KPlayer(DFPlayer):
             raise ValueError("Track number must be between 0 and 9999")
         self._exec_command(DFPLAYER_CMD_PLAY_ADVERT, track_number >> 8, track_number & 0xFF, check_error=True)
 
-    # def set_playback_source(self, source : PlaybackSource):
-    #     """
-    #     Set the playback source.
-    #     1: USB, 2: TF Card, 4: Flash
-    #     """
-    #     if source < 1 or source > 4:
-    #         raise ValueError("Playback source must be between 1 and 4")
-    #     # According to the datasheet, this command takes 200ms
-    #     self._exec_command(DFPLAYER_CMD_SET_SOURCE, 0x00, source, 200)
-
-    

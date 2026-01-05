@@ -100,8 +100,6 @@ DFPLAYER_CMD_FILES_FLASH = const(0x49)  # Get the total number of files on the i
 DFPLAYER_CMD_FILENO_USB = const(0x4b)  # Get the currently select file number on the USB storage.
 DFPLAYER_CMD_FILENO_SDCARD = const(0x4c)  # Get the currently select file number on the SD-Card.    
 DFPLAYER_CMD_FILENO_FLASH = const(0x4d)  # Get the currently select file number on the NOR flash.
-DFPLAYER_CMD_FILES_IN_FOLDER = const(0x4e)  # Get the number of files in the current folder.
-DFPLAYER_CMD_FOLDERS = const(0x4f)  # Get the number of folders.
 
 class Frame():
     def __init__(self, raw_data):
@@ -407,6 +405,16 @@ class DFPlayer:
         """Enter standby mode."""
         self._exec_command(DFPLAYER_CMD_STANDBY_ENTER)
 
+    def set_playback_source(self, source : int):
+        """
+        Set the playback source.
+        USB disk, SD card, AUX, SLEEP, FLASH (not all variants support all sources).
+        Parameters:
+            source (int): Source identifier as per DFPlayer documentation (depending on variant).            
+        """
+        # According to the datasheet, this command takes 200ms
+        self._exec_command(DFPLAYER_CMD_SET_SOURCE, 0x00, source)
+
     @property
     def status(self) -> PlayerStatus | None:
         """
@@ -532,4 +540,4 @@ class DFPlayer:
         """Return the currently selected file number on the internal flash storage."""
         response = self._exec_command(DFPLAYER_CMD_FILENO_FLASH, is_query=True)
         return response.data if response else None
-        return response.data if response else None
+    
