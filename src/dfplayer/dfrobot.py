@@ -4,11 +4,6 @@ from .dfplayer import DFPlayer
 DFPLAYER_CMD_STANDBY_EXIT = const(0x0b)  # Exit low power mode, back to normal mode.
 DFPLAYER_CMD_VOLUME_ADJUST_SET = const(0x10) # Set the DAC gain. (0-31)
 
-DFPLAYER_CMD_GET_FILES_SDCARD = const(0x47)  # Get the total number of files on the SD card.
-DFPLAYER_CMD_GET_FILES_USB = const(0x48)  # Get the total number of files on USB storage.
-DFPLAYER_CMD_FILENO_SDCARD = const(0x4b)  # Get the currently select file number on the SD-Card.
-DFPLAYER_CMD_FILENO_USB = const(0x4c)  # Get the currently select file number on the USB storage.
-
 class PlaybackSource:
     USB = 0
     SD_CARD = 1
