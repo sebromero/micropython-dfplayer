@@ -404,6 +404,8 @@ class DFPlayer:
 
     def play_track_by_number(self, track_number):
         """Play the given track number from the flattened file list."""
+        if track_number < 1:
+            raise ValueError("Track number must be greater than or equal to 1")
         self._exec_command(DFPLAYER_CMD_PLAY_TRACK, track_number >> 8, track_number & 0xFF, check_error=True)
 
     def play_from_mp3_folder(self, track_number):
@@ -418,8 +420,8 @@ class DFPlayer:
         On DFRobot's DFPlayer: Raises DFPLAYER_ERROR_INSERTION_CMD if playback is not active.
         On MH2024K/GD3200: Resumes playback afterwards no matter if playback was active or not.
         """
-        if track_number < 0 or track_number > DFPLAYER_MAX_ADVERT_FILE:
-            raise ValueError("Track number must be between 0 and 9999")
+        if track_number < 1 or track_number > DFPLAYER_MAX_ADVERT_FILE:
+            raise ValueError("Track number must be between 1 and 9999")
         self._exec_command(DFPLAYER_CMD_PLAY_ADVERT, track_number >> 8, track_number & 0xFF, check_error=True)
 
     def loop_track(self, track_id):
