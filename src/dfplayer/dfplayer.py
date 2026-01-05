@@ -90,8 +90,18 @@ DFPLAYER_CMD_GET_VOLUME = const(0x43)  # Retrieve the current volume.
 DFPLAYER_CMD_GET_EQUALIZER = const(0x44)  # Retrieve the current equalizer setting.
 DFPLAYER_CMD_GET_PLAYBACK_MODE = const(0x45)  # Retrieve the current playback mode.
 DFPLAYER_CMD_GET_VERSION = const(0x46)  # Retrieve the device's software version.
+
+# Commands to query files
+# Warning: The documentation of DFRobot's DFPlayer mixes up those commands
+# It follows the documentation of the MH2024K/GD3200 instead
+DFPLAYER_CMD_FILES_USB = const(0x47)  # Get the total number of files on USB storage.
+DFPLAYER_CMD_FILES_SDCARD = const(0x48)  # Get the total number of files on the SD card.
 DFPLAYER_CMD_FILES_FLASH = const(0x49)  # Get the total number of files on the internal flash.
+DFPLAYER_CMD_FILENO_USB = const(0x4b)  # Get the currently select file number on the USB storage.
+DFPLAYER_CMD_FILENO_SDCARD = const(0x4c)  # Get the currently select file number on the SD-Card.    
 DFPLAYER_CMD_FILENO_FLASH = const(0x4d)  # Get the currently select file number on the NOR flash.
+DFPLAYER_CMD_FILES_IN_FOLDER = const(0x4e)  # Get the number of files in the current folder.
+DFPLAYER_CMD_FOLDERS = const(0x4f)  # Get the number of folders.
 
 class Frame():
     def __init__(self, raw_data):
@@ -239,7 +249,7 @@ class EqualizerMode:
     ROCK = 2
     JAZZ = 3
     CLASSIC = 4
-    BASS = 5
+    BASS = 5 # Seems unsupported on DFRobot's DFPlayer
 
 class DFPlayer:    
     def __init__(self, uart, busy_pin = None):
@@ -315,6 +325,7 @@ class DFPlayer:
         if not check_error:
             return cmd_response
 
+        # The following handles errors for execution commands such as play_track
         # Error response should be received within a short time
         # Increase the timeout to ~1000ms to account for edge cases
         # e.g. when executing play_track(1,123) while inserting an SD card
@@ -337,13 +348,6 @@ class DFPlayer:
             # print(f"Clearing {spurious_data} bytes of spurious data from UART buffer after reset")
             self.uart.read(spurious_data)
         
-        # TODO: Remove. Handled by notification filtering
-        # self._frame_reader.update()
-        # last_frame = self._frame_reader.peek_frame()
-        # if last_frame and last_frame.command == DFPLAYER_CMD_INIT:
-        #     print("Removing bootup OK response from buffer")
-        #     self._frame_reader.pop_frame()  # Remove the bootup OK response
-
     def next_track(self):
         self._exec_command(DFPLAYER_CMD_NEXT)
     
@@ -482,7 +486,9 @@ class DFPlayer:
     @property
     def playback_mode(self) -> int | None:
         """
-        Return the current playback mode.
+        Return the current playback mode:
+        Full cycle | Single cycle | Folder loop | 
+        Random loop | Play the single once | Single seamless loop
         The meaning of the return values is device-dependent.
         """
         response = self._exec_command(DFPLAYER_CMD_GET_PLAYBACK_MODE, is_query=True)
@@ -495,7 +501,35 @@ class DFPlayer:
         return response.data if response else None
     
     @property
+    def file_count_usb(self) -> int | None:
+        """Return the number of files on the USB storage."""
+        response = self._exec_command(DFPLAYER_CMD_FILES_USB, is_query=True)
+        return response.data if response else None
+    
+    @property
+    def file_count_sdcard(self) -> int | None:
+        """Return the number of files on the SD card."""
+        response = self._exec_command(DFPLAYER_CMD_FILES_SDCARD, is_query=True)
+        return response.data if response else None    
+    
+    @property
+    def current_file_number_sdcard(self) -> int | None:
+        """
+        Return the currently selected file number on the SD card.
+        This number is the same as the track number used in play_track_by_number().
+        """
+        response = self._exec_command(DFPLAYER_CMD_FILENO_SDCARD, is_query=True)
+        return response.data if response else None
+    
+    @property
+    def current_file_number_usb(self) -> int | None:
+        """Return the currently selected file number on the USB storage."""
+        response = self._exec_command(DFPLAYER_CMD_FILENO_USB, is_query=True)
+        return response.data if response else None
+    
+    @property
     def current_file_number_flash(self) -> int | None:
         """Return the currently selected file number on the internal flash storage."""
         response = self._exec_command(DFPLAYER_CMD_FILENO_FLASH, is_query=True)
+        return response.data if response else None
         return response.data if response else None
