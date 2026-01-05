@@ -11,11 +11,6 @@ DFPLAYER_CMD_FOLDERS = const(0x4f)  # Get the number of folders.
 # DFPLAYER_CMD_REPEAT = const(0x19)  # 0 = repeat currently played file, 1 = stop repeating
 # DFPLAYER_CMD_ADVERT_FOLDER = const(0x25) # Set the advert folder 1-9
 
-# Error codes sent as parameter of error messages
-# DFPLAYER_ERROR_BUSY = const(0x01)  # Module is busy.
-# DFPLAYER_ERROR_FRAME = const(0x03)  # Received incomplete frame.
-# DFPLAYER_ERROR_FCS = const(0x04)  # Frame check sequence of last frame didn't match.
-
 class PlaybackSource:
     USB = 1
     SD_CARD = 2

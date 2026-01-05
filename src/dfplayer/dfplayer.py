@@ -66,8 +66,16 @@ DFPLAYER_RESPONSE_ERROR = const(0x40)  # While processing the most recent comman
 DFPLAYER_RESPONSE_ACK = const(0x41)  # Last command succeeded.
 
 # Error codes sent as parameter of error messages
+# Warning: The documentation of DFRobot's DFPlayer seems to be wrong/incomplete here
+DFPLAYER_ERROR_BUSY = const(0x01)  # Module is busy (initialization not done).
+DFPLAYER_ERROR_SLEEPING = const(0x02)  # Module is in sleep mode (only on specific devices).
+DFPLAYER_ERROR_FRAME = const(0x03)  # Received incomplete frame over UART.
+DFPLAYER_ERROR_FCS = const(0x04)  # Checksum of last frame incorrect.
+DFPLAYER_ERROR_OUT_OF_RANGE = const(0x05)  # Requested track/folder is out of range.
 DFPLAYER_ERROR_NO_SUCH_FILE = const(0x06)  # File/folder selected for playback (command 0x06) does not exist.
 DFPLAYER_ERROR_INSERTION_CMD = const(0x07)  # inserting operation only can be donewhen a track is being played
+DFPLAYER_ERROR_SD_READ = const(0x08)  # SD-card reading failed (SD-card pulled out or damaged).
+DFPLAYER_ERROR_SLEEP_MODE = const(0x0A)  # Error while entering sleep mode (only on specific devices).
 
 # Common Commands
 DFPLAYER_CMD_NEXT = const(0x01)  # Start playing the next song.
@@ -84,11 +92,11 @@ DFPLAYER_CMD_RESET = const(0x0c)  # Reset the DFPlayer Mini.
 DFPLAYER_CMD_PLAY = const(0x0d)  # Start playing the selected file.
 DFPLAYER_CMD_PAUSE = const(0x0e)  # Pause the playback.
 DFPLAYER_CMD_PLAY_FILE = const(0x0f)  # Play the given file (1-255) in the given folder (1-99)
+DFPLAYER_CMD_REPEAT_ALL = const(0x11)  # Start/stop repeat-playing the whole source. 1=loop 0=stop
 DFPLAYER_CMD_PLAY_FROM_MP3 = const(0x12)  # Play the given file (1-9999) from the folder "MP3"
 DFPLAYER_CMD_PLAY_ADVERT = const(0x13)  # Play the given file (1-9999) from the folder "ADVERT", resume current playback afterwards.
 DFPLAYER_CMD_STOP = const(0x16)  # Stop playback.
 DFPLAYER_CMD_MUTE = const(0x1a)  # Mute/unmute the audio output. 0=unmute, 1=mute
-DFPLAYER_CMD_REPEAT_ALL = const(0x11)  # Start/stop repeat-playing the whole source. 1=loop 0=stop
 DFPLAYER_CMD_GET_STATUS = const(0x42)  # Retrieve the current status.
 DFPLAYER_CMD_GET_VOLUME = const(0x43)  # Retrieve the current volume.
 DFPLAYER_CMD_GET_EQUALIZER = const(0x44)  # Retrieve the current equalizer setting.
@@ -286,12 +294,20 @@ class DFPlayer:
     def _handle_error_response(self, response_data):
         if response_data == DFPLAYER_ERROR_NO_SUCH_FILE:
             raise RuntimeError("No such file or folder")
-        # if response_data == DFPLAYER_ERROR_BUSY:
-        #     raise RuntimeError("DFPlayer is busy")
-        # if response_data == DFPLAYER_ERROR_FRAME:
-        #     raise RuntimeError("DFPlayer received incomplete frame")
-        # if response_data == DFPLAYER_ERROR_FCS:
-        #     raise RuntimeError("DFPlayer received corrupted frame (FCS mismatch)")
+        if response_data == DFPLAYER_ERROR_BUSY:
+            raise RuntimeError("DFPlayer is busy")
+        if response_data == DFPLAYER_ERROR_FRAME:
+            raise RuntimeError("DFPlayer received incomplete frame")
+        if response_data == DFPLAYER_ERROR_FCS:
+            raise RuntimeError("DFPlayer received corrupted frame (FCS mismatch)")
+        if response_data == DFPLAYER_ERROR_OUT_OF_RANGE:
+            raise RuntimeError("Requested track or folder is out of range")
+        if response_data == DFPLAYER_ERROR_SD_READ:
+            raise RuntimeError("SD-card reading failed (SD-card pulled out or damaged)")
+        if response_data == DFPLAYER_ERROR_SLEEP_MODE:
+            raise RuntimeError("Error while entering sleep mode")
+        if response_data == DFPLAYER_ERROR_SLEEPING:
+            raise RuntimeError("Module is in sleep mode")
         if response_data == DFPLAYER_ERROR_INSERTION_CMD:
             raise RuntimeError("Insertion operation can only be done when a track is being played")
         raise RuntimeError(f"Unknown error. Data: {hex(response_data)}")          

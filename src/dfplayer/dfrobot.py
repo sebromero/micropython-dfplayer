@@ -9,11 +9,6 @@ DFPLAYER_CMD_GET_FILES_USB = const(0x48)  # Get the total number of files on USB
 DFPLAYER_CMD_FILENO_SDCARD = const(0x4b)  # Get the currently select file number on the SD-Card.
 DFPLAYER_CMD_FILENO_USB = const(0x4c)  # Get the currently select file number on the USB storage.
 
-# Error codes sent as parameter of error messages
-# DFPLAYER_ERROR_BUSY = const(0x00)  # Module is busy.
-# DFPLAYER_ERROR_FRAME = const(0x01)  # Received incomplete frame.
-# DFPLAYER_ERROR_FCS = const(0x02)  # Frame check sequence of last frame didn't match.
-
 class PlaybackSource:
     USB = 0
     SD_CARD = 1
