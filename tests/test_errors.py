@@ -7,7 +7,7 @@ Make sure you don't have:
 """
 from machine import UART, Pin
 from time import sleep_ms
-from dfplayer import DFRobotPlayer, MH2024KPlayer, PlayerStatus
+from dfplayer import DFRobotPlayer, MH2024KPlayer
 
 uart1 = UART(0, tx=Pin("TX"), rx=Pin("RX"))
 uart2 = UART(1, tx=Pin("D9"), rx=Pin("D8"))

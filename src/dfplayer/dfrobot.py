@@ -2,19 +2,18 @@ from micropython import const
 from .dfplayer import DFPlayer, DFPLAYER_CMD_PLAY_TRACK, DFPLAYER_CMD_SET_SOURCE
 
 DFPLAYER_CMD_STANDBY_EXIT = const(0x0b)  # Exit low power mode, back to normal mode.
-# DFPLAYER_CMD_SET_PLAYBACK_MODE = const(0x08)  # Set the playback mode. (0-3)
+DFPLAYER_CMD_SET_PLAYBACK_MODE = const(0x08)  # Set the playback mode. (0-3)
 # DFPLAYER_CMD_VOLUME_ADJUST_SET = const(0x10) # TODO
 
-# DFPLAYER_CMD_FILES_SDCARD = const(0x47)  # Get the total number of files on the SD card.
-# DFPLAYER_CMD_FILES_USB = const(0x48)  # Get the total number of files on USB storage.
-# DFPLAYER_CMD_FILENO_SDCARD = const(0x4b)  # Get the currently select file number on the SD-Card.
-# DFPLAYER_CMD_FILENO_USB = const(0x4c)  # Get the currently select file number on the USB storage.
-# DFPLAYER_CMD_FILENO_FLASH = const(0x4d)  # Get the currently select file number on the NOR flash.
+DFPLAYER_CMD_GET_FILES_SDCARD = const(0x47)  # Get the total number of files on the SD card.
+DFPLAYER_CMD_GET_FILES_USB = const(0x48)  # Get the total number of files on USB storage.
+DFPLAYER_CMD_FILENO_SDCARD = const(0x4b)  # Get the currently select file number on the SD-Card.
+DFPLAYER_CMD_FILENO_USB = const(0x4c)  # Get the currently select file number on the USB storage.
 
 # Error codes sent as parameter of error messages
-DFPLAYER_ERROR_BUSY = const(0x00)  # Module is busy.
-DFPLAYER_ERROR_FRAME = const(0x01)  # Received incomplete frame.
-DFPLAYER_ERROR_FCS = const(0x02)  # Frame check sequence of last frame didn't match.
+# DFPLAYER_ERROR_BUSY = const(0x00)  # Module is busy.
+# DFPLAYER_ERROR_FRAME = const(0x01)  # Received incomplete frame.
+# DFPLAYER_ERROR_FCS = const(0x02)  # Frame check sequence of last frame didn't match.
 
 # class PlaybackSource:
 #     USB = 0
@@ -48,6 +47,7 @@ class DFRobotPlayer(DFPlayer):
     # Additional commands
 
     # TODO: Doesn't seem to work on DFROBOT|LISP3
+    # Device keeps sending error responses after sending this command
     def exit_standby(self):
         """Exit low power mode, back to normal mode."""
         self._exec_command(DFPLAYER_CMD_STANDBY_EXIT)
@@ -63,11 +63,12 @@ class DFRobotPlayer(DFPlayer):
     #     self._exec_command(DFPLAYER_CMD_SET_SOURCE, 0x00, source, 200)
 
     # TODO: Doesn't seem to work on DFROBOT|LISP3
-    # def set_playback_mode(self, mode: int):
-    #     """
-    #     Set the playback mode (0 - 3). 
-    #     0 = repeat, 1 = folder repeat, 2 = single repeat, 3 = random.
-    #     """
-    #     if mode < 0 or mode > 3:
-    #         raise ValueError("Playback mode must be between 0 and 3")
-    #     self._exec_command(DFPLAYER_CMD_SET_PLAYBACK_MODE, 0x00, mode)
+    # Device goes crazy after sending this command, sending random data
+    def set_playback_mode(self, mode: int):
+        """
+        Set the playback mode (0 - 3). 
+        0 = repeat, 1 = folder repeat, 2 = single repeat, 3 = random.
+        """
+        if mode < 0 or mode > 3:
+            raise ValueError("Playback mode must be between 0 and 3")
+        self._exec_command(DFPLAYER_CMD_SET_PLAYBACK_MODE, 0x00, mode)

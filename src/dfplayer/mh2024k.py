@@ -20,9 +20,9 @@ DFPLAYER_CMD_PLAY_ADVERT = const(0x13)  # Play the given file (1-9999) from the 
 # DFPLAYER_CMD_FOLDERS = const(0x4f)  # Get the number of folders.
 
 # Error codes sent as parameter of error messages
-DFPLAYER_ERROR_BUSY = const(0x01)  # Module is busy.
-DFPLAYER_ERROR_FRAME = const(0x03)  # Received incomplete frame.
-DFPLAYER_ERROR_FCS = const(0x04)  # Frame check sequence of last frame didn't match.
+# DFPLAYER_ERROR_BUSY = const(0x01)  # Module is busy.
+# DFPLAYER_ERROR_FRAME = const(0x03)  # Received incomplete frame.
+# DFPLAYER_ERROR_FCS = const(0x04)  # Frame check sequence of last frame didn't match.
 
 # class PlaybackSource:
 #     USB = 1
@@ -47,6 +47,10 @@ class MH2024KPlayer(DFPlayer):
     def repeat_all(self, repeat):
         # TODO: Further investigate this
         raise NotImplementedError("MH2024KPlayer should support repeat all but it's broken.")
+
+    @property
+    def software_version(self) -> int | None:
+        raise NotImplementedError("MH2024KPlayer should support software version but it's broken.")
 
     # Additional commands
 
