@@ -332,7 +332,9 @@ class DFPlayer:
             self._on_media_inserted(frame.data) if self._on_media_inserted else None
         elif cmd == _DFPLAYER_NOTIFY_EJECT:
             self._on_media_ejected(frame.data) if self._on_media_ejected else None
-        elif cmd in [_DFPLAYER_NOTIFY_DONE_USB, _DFPLAYER_NOTIFY_DONE_SDCARD, _DFPLAYER_NOTIFY_DONE_FLASH]:            
+        elif cmd in [_DFPLAYER_NOTIFY_DONE_USB, _DFPLAYER_NOTIFY_DONE_SDCARD, _DFPLAYER_NOTIFY_DONE_FLASH]:
+            # We consolidate all "done" notifications into a single callback
+            # since only one source can be active at a time anyway.
             self._on_track_finished(frame.data) if self._on_track_finished else None
 
     def _on_busy_pin_change(self, pin):
