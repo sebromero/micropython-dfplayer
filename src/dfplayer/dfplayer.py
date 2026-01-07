@@ -339,17 +339,21 @@ class DFPlayer:
          # High level during playback; Low in pause status and module sleep
         self._playing = pin.value() == 0
 
+    def _calculate_checksum(self, command, data_high, data_low, ack):
+        frame_check_init = -(DFPLAYER_VERSION + DFPLAYER_LEN)
+        ack_flag = DFPLAYER_ACK if ack else DFPLAYER_NO_ACK
+        checksum = frame_check_init - (command + ack_flag + data_low + data_high)
+        return checksum >> 8, checksum & 0xFF
+
     def _send_command(self, command, data_high = 0x0, data_low = 0x0, ack = True):
         # Ensure command is only one byte long
         if command > 0xFF:
             raise ValueError("Command must be a single byte")
         if data_high > 0xFF or data_low > 0xFF:
             raise ValueError("Data high and low must be single byte values")
-        frame_check_init = -(DFPLAYER_VERSION + DFPLAYER_LEN)
         ack_flag = DFPLAYER_ACK if ack else DFPLAYER_NO_ACK
-        checksum = frame_check_init - (command + ack_flag + data_low + data_high)
-        high_byte, low_byte = checksum >> 8, checksum & 0xFF
-        frame = [DFPLAYER_START, DFPLAYER_VERSION, DFPLAYER_LEN, command, ack_flag, data_high, data_low, high_byte, low_byte, DFPLAYER_END]        
+        fcs_high, fcs_low = self._calculate_checksum(command, data_high, data_low, ack)
+        frame = [DFPLAYER_START, DFPLAYER_VERSION, DFPLAYER_LEN, command, ack_flag, data_high, data_low, fcs_high, fcs_low, DFPLAYER_END]        
         frame = bytes([b & 0xFF for b in frame]) # Convert to unsigned bytes
         self.uart.write(bytes(frame))
         self.uart.flush() # Wait until all data is sent        
