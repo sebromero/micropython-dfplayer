@@ -7,7 +7,7 @@ uart2 = UART(1, tx=Pin("D9"), rx=Pin("D8"))
 mhplayer = MH2024KPlayer(uart1)
 mhplayer.volume = 50
 
-dfrplayer = DFRobotPlayer(uart2)
+dfrplayer = DFRobotPlayer(uart2, use_irq=True)
 dfrplayer.volume = 50
 
 def get_frame_count(player):
@@ -22,11 +22,5 @@ def print_next_frame(player):
     else:
         print("No frame available")
 
-mhplayer.on_device_ready(lambda data: print(f"MH2024K Player ready with data: {hex(data)}"))
-dfrplayer.on_device_ready(lambda data: print(f"DFRobot Player ready with data: {hex(data)}"))
 mhplayer.on_track_finished(lambda track: print(f"MH2024K Player finished track: {track}"))
 dfrplayer.on_track_finished(lambda track: print(f"DFRobot Player finished track: {track}"))
-mhplayer.on_media_inserted(lambda media: print(f"MH2024K Player media inserted: {media}"))
-dfrplayer.on_media_inserted(lambda media: print(f"DFRobot Player media inserted: {media}"))
-mhplayer.on_media_ejected(lambda media: print(f"MH2024K Player media ejected: {media}"))
-dfrplayer.on_media_ejected(lambda media: print(f"DFRobot Player media ejected: {media}"))
