@@ -24,12 +24,14 @@ def get_response_time(player, command, timeout_ms=5000) -> int | None:
         if time.ticks_diff(time.ticks_ms(), start_time) > timeout_ms:
             return None
         
-        frames_received = player._frame_reader.update(timeout_ms=timeout_ms)
-        if frames_received == 0:
+        player._frame_reader.update(timeout_ms=timeout_ms)
+        available_frames = player._frame_reader.available_frames()
+        
+        if available_frames == 0:
             sleep_ms(1)
             continue
         
-        for _ in range(frames_received):
+        for _ in range(available_frames):
             next_frame = player._frame_reader.pop_frame()
             if next_frame.command != command:
                 continue

@@ -1,7 +1,7 @@
 # Author: Sebastian Romero
 
-from micropython import const
-from machine import Pin
+from micropython import const, schedule
+from machine import Pin, UART
 from time import sleep_ms, ticks_ms
 import struct
 from collections import deque
@@ -157,13 +157,23 @@ class Frame():
         return self.command == DFPLAYER_RESPONSE_ACK
 
 class FrameReader():
-    def __init__(self, uart):
+    def __init__(self, uart, use_irq = False):
+        """
+        Initialize the FrameReader.
+        Parameters:
+            uart (UART): The UART instance to read frames from.
+            use_irq (bool): Whether to use IRQ for reading frames. Default is False.
+                            Note: On ESP32 it uses Timer(0) which makes it unavailable for other uses.
+        """
         self.uart = uart
         self._frames = deque([], 10)  # Store up to 10 frames
         self._on_notification = None
-        # TODO: Consider using IRQ on uart RX
-        # On ESP32 it uses Timer(0) which makes it unavailable for other uses
-        #uart.irq(handler= lambda e: print("UART IRQ fired!"), trigger=UART.IRQ_RXIDLE)
+        self._use_irq = use_irq
+        
+        if use_irq:        
+            # IRQ_RXIDLE is not available on all ports (e.g. CC3200, NRF), use IRQ_RX in that case
+            trigger_event = UART.IRQ_RXIDLE if hasattr(UART, 'IRQ_RXIDLE') else UART.IRQ_RX
+            uart.irq(handler= lambda _: schedule(self._update_from_irq, None), trigger=trigger_event)
 
     def _read_frame(self, timeout_ms = 1000) -> Frame | None:
         if self.uart.any() == 0:
@@ -203,7 +213,15 @@ class FrameReader():
             f = self._frames.popleft()
             print(f"DEBUG: Discarding frame during clear. Code: {hex(f.command)} Data: {hex(f.data)}")
 
-    def update(self, await_frames = 0, timeout_ms = 1000) -> int:
+    def _update_from_irq(self, _):
+        """
+        Updates the frame buffer from UART triggered by IRQ as soon as data is available.        
+        This function is scheduled from the IRQ handler and does not run in IRQ context.
+        """
+        if self.uart.any() >= DFPLAYER_FRAME_SIZE:
+            self._process_frames()
+
+    def _process_frames(self, await_frames = 0, timeout_ms = 1000) -> int:
         """
         Read frames from the UART and store them in the internal buffer.
         If await_frames > 0, wait until at least that many frames are available or timeout occurs.
@@ -238,6 +256,27 @@ class FrameReader():
                 continue
             self._frames.append(f)
             frames_added += 1
+
+    def update(self, await_frames = 0, timeout_ms = 1000) -> int:
+        """
+        Ensures that at least requested amount of frames are available in the internal buffer.
+        If await_frames > 0, wait until at least that many frames are available or timeout occurs.
+        If timeout_ms is None, wait indefinitely.
+        If await_frames is 0, process available frames without waiting (timeout does not apply).
+        In IRQ mode, frames are read in the IRQ handler hence this function always returns 0.
+        """
+        if self._use_irq:
+            start_time = ticks_ms()
+            while True:
+                timeout_elapsed = timeout_ms is not None and (ticks_ms() - start_time) >= timeout_ms
+                frequested_frames_received = len(self._frames) >= await_frames
+                
+                if timeout_elapsed or frequested_frames_received:
+                    break
+                sleep_ms(10) # Give some time for IRQ handler to process incoming data
+                    
+            return 0 # In IRQ mode, frames are read in the IRQ handler
+        return self._process_frames(await_frames, timeout_ms)
             
     def available_frames(self):
         return len(self._frames)
@@ -269,7 +308,7 @@ class EqualizerMode:
     BASS = 5 # Seems unsupported on DFRobot's DFPlayer
 
 class DFPlayer:    
-    def __init__(self, uart, busy_pin = None):
+    def __init__(self, uart, busy_pin = None, use_irq = False):
         self.uart = uart
         uart.init(baudrate=DFPLAYER_BAUD, bits=DFPLAYER_DATA_BITS, parity=DFPLAYER_PARITY, stop=DFPLAYER_STOP_BITS, timeout=DFPLAYER_TIMEOUT_UART_MS)
         self.busy_pin = busy_pin
@@ -277,7 +316,7 @@ class DFPlayer:
             self.busy_pin.init(Pin.IN)
             busy_pin.irq(trigger=Pin.IRQ_RISING | Pin.IRQ_FALLING, handler=self._on_busy_pin_change)
         
-        self._frame_reader = FrameReader(uart)
+        self._frame_reader = FrameReader(uart, use_irq=use_irq)
         self._frame_reader.set_notification_callback(self._handle_notification)
 
         self._on_track_finished = None
