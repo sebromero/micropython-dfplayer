@@ -18,7 +18,7 @@ def run_tests(player):
         print("✅ Status after stop correct")
 
     player.play()
-    sleep_ms(250) # Sometimes it takes a moment to start playing
+    sleep_ms(500) # Sometimes it takes a moment to start playing
     status = player.status
     if status != PlayerStatus.PLAYING:
         raise RuntimeError(f"Read incorrect status after play: {status}")
@@ -41,5 +41,23 @@ def run_tests(player):
 
     player.stop()
 
-run_tests(mhplayer)
-run_tests(dfrplayer)
+    player.next_track()
+    sleep_ms(500) # Sometimes it takes a moment to start playing
+    status = player.status
+    if status != PlayerStatus.PLAYING:
+        raise RuntimeError(f"Read incorrect status after next_track: {status}")
+    else:        
+        print("✅ Status after next_track correct")
+
+try:
+    run_tests(mhplayer)
+except RuntimeError as e:
+    print(f"❌ {e}")
+
+try:
+    run_tests(dfrplayer)
+except RuntimeError as e:
+    print(f"❌ {e}")
+
+mhplayer.stop()
+dfrplayer.stop()    
