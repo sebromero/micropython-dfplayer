@@ -12,6 +12,9 @@ class PlaybackSource:
     FLASH = 4
 
 class DFRobotPlayer(DFPlayer):
+    """
+    DFRobot|LISP3 player implementation. This is the default player for DFROBOT branded devices, but should also work on other devices that use the same command set.
+    """
 
     # OVERRIDES
 
@@ -28,13 +31,13 @@ class DFRobotPlayer(DFPlayer):
 
     # Additional commands
 
-    # TODO: Doesn't seem to work on DFROBOT|LISP3
+    # Doesn't seem to work on DFROBOT|LISP3
     # Device keeps sending error responses after sending this command
     def exit_standby(self):
         """Exit low power mode, back to normal mode."""
         self._exec_command(DFPLAYER_CMD_STANDBY_EXIT)
 
-    # TODO: Doesn't seem to work on DFROBOT|LISP3
+    # Doesn't seem to work on DFROBOT|LISP3
     # Device acknowledges the command but gain doesn't change
     def set_dac_gain(self, enabled: bool, gain: int = 31):
         """

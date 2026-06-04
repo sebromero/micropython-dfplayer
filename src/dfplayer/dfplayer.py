@@ -95,9 +95,13 @@ _DFPLAYER_CMD_PLAY_FILE = const(0x0f)  # Play the given file (1-255) in the give
 _DFPLAYER_CMD_REPEAT_ALL = const(0x11)  # Start/stop repeat-playing the whole source. 1=loop 0=stop
 _DFPLAYER_CMD_PLAY_FROM_MP3 = const(0x12)  # Play the given file (1-9999) from the folder "MP3"
 _DFPLAYER_CMD_PLAY_ADVERT = const(0x13)  # Play the given file (1-9999) from the folder "ADVERT", resume current playback afterwards.
+_DFPLAYER_CMD_FILE_LARGE = const(0x14)  # Play the given file (1-4095) in the given folder (1-15).
+_DFPLAYER_CMD_ABORT_ADVERT = const(0x15)  # Abort advert playback and resume current playback.
 _DFPLAYER_CMD_STOP = const(0x16)  # Stop playback.
 _DFPLAYER_CMD_REPEAT_FOLDER = const(0x17)  # Start repeat-playing the given folder (1-99)
+_DFPLAYER_CMD_RANDOM = const(0x18)  # Start playing all files in random order.
 _DFPLAYER_CMD_MUTE = const(0x1a)  # Mute/unmute the audio output. 0=unmute, 1=mute
+_DFPLAYER_CMD_ADVERT_FOLDER = const(0x25) # Play from advert folder 1-9
 _DFPLAYER_CMD_GET_STATUS = const(0x42)  # Retrieve the current status.
 _DFPLAYER_CMD_GET_VOLUME = const(0x43)  # Retrieve the current volume.
 _DFPLAYER_CMD_GET_EQUALIZER = const(0x44)  # Retrieve the current equalizer setting.
@@ -113,6 +117,8 @@ _DFPLAYER_CMD_FILES_FLASH = const(0x49)  # Get the total number of files on the 
 _DFPLAYER_CMD_FILENO_USB = const(0x4b)  # Get the currently select file number on the USB storage.
 _DFPLAYER_CMD_FILENO_SDCARD = const(0x4c)  # Get the currently select file number on the SD-Card.    
 _DFPLAYER_CMD_FILENO_FLASH = const(0x4d)  # Get the currently select file number on the NOR flash.
+_DFPLAYER_CMD_FILES_IN_FOLDER = const(0x4e)  # Get the number of files in the current folder.
+_DFPLAYER_CMD_FOLDERS = const(0x4f)  # Get the number of folders.
 
 class Frame():
     def __init__(self, raw_data):
@@ -382,6 +388,18 @@ class DFPlayer:
         raise RuntimeError(f"Unknown error. Data: {hex(response_data)}")          
 
     def _exec_command(self, command, data_high = 0x0, data_low = 0x0, ack = True, is_query = False, check_error = False):
+        """
+        Execute a command on the DFPlayer module.
+
+        Parameters:
+            command (int): The command byte to send.
+            data_high (int): The high byte of the command data (default: 0x00).
+            data_low (int): The low byte of the command data (default: 0x00).
+            ack (bool): Whether to wait for an ACK response from the DFPlayer (default: True).
+            is_query (bool): Whether the command is a query that expects a response containing data (default: False).
+            check_error (bool): Whether to check for an error response after executing the command (default: False). 
+                If True, the function will wait for an error response and raise an exception if an error is received.
+        """
         # There shouldn't be any pending frames when sending a new command
         # however, if a response was received after the previous command timed out, it might be still in the buffer
         self._frame_reader.update()
@@ -516,6 +534,47 @@ class DFPlayer:
             raise ValueError("Track number must be between 1 and 9999")
         self._exec_command(_DFPLAYER_CMD_PLAY_ADVERT, track_number >> 8, track_number & 0xFF, check_error=True)
 
+    def play_from_custom_advert_folder(self, folder: int, track: int):
+        """
+        Play a track from the custom advert folder (1-9).
+        The advert folder is a special folder that can be used to store short audio clips.
+        The structure should be e.g. ADVERT2/001-Beep.mp3
+        Starts/resumes playback after advertisment is done.
+        """
+        if folder < 1 or folder > 9:
+            raise ValueError("Advert folder number must be between 1 and 9")
+        if track < 1 or track > 255:
+            raise ValueError("Track number must be between 1 and 255")
+        self._exec_command(_DFPLAYER_CMD_ADVERT_FOLDER, folder, track, check_error=True)
+
+    def play_random(self):
+        """Start playing all tracks from the current source in random order."""
+        self._exec_command(_DFPLAYER_CMD_RANDOM)
+
+    def play_file_large(self, folder: int, file: int):
+        """
+        Play the given file (1-4095) in the given folder (1-15).
+        This is for use cases where the file number exceeds 255 and cannot 
+        be specified with the regular play_file command.
+
+        Parameters:
+            folder (int): The folder number (1-15)
+            file (int): The file number (1-4095)
+        """
+        if folder < 1 or folder > 15:
+            raise ValueError("Folder number must be between 1 and 15")
+        if file < 1 or file > 4095:
+            raise ValueError("File number must be between 1 and 4095")
+        
+        # The high 4 bytes represent the folder name
+        # The low 12 bytes represent the file name
+        data = ((folder & 0x0F) << 12) | (file & 0x0FFF)
+        self._exec_command(_DFPLAYER_CMD_FILE_LARGE, (data >> 8) & 0xFF, data & 0xFF, check_error=True)
+
+    def abort_advert(self):
+        """Abort advert playback and resume current playback."""
+        self._exec_command(_DFPLAYER_CMD_ABORT_ADVERT)
+
     def loop_track(self, track_id):
         """
         Loop the given track ID (0-65535) indefinitely. Starts playback.
@@ -537,10 +596,8 @@ class DFPlayer:
 
     def repeat_folder(self, folder: int):
         """
-        Start repeat-playing the given folder (1-99)
-        The order of tracks is variant specific.
-        On DFROBOT|LISP3, tracks are played in alphanumeric order.
-        On MH2024K, tracks are played in the order they were added to the file table.
+        Start repeat-playing the given folder (1-99)        
+        Tracks are played in the order they were added to the file table.
         """
         if folder < 1 or folder > _DFPLAYER_MAX_FOLDER:
             raise ValueError("Folder number must be between 1 and 99")
@@ -665,6 +722,28 @@ class DFPlayer:
         response = self._exec_command(_DFPLAYER_CMD_FILES_SDCARD, is_query=True)
         return response.data if response else None    
     
+    def file_count_in_folder(self, folder: int) -> int | None:
+        """Return the number of files in the given folder."""
+        # Don't ask for an ACK message, since on DFROBOT|LISP3 the device responds 
+        # with an ACK message first followed by the query response
+        # wich is in reverse order compared to other queries. 
+        # This is a workaround to avoid having to handle this special case in the main query handling code.
+        # TODO: Check if we can handle this better by improving the query handling code
+        # TODO: Error handling is not working for this command, since also the error response gets sent before the query response.
+        response = self._exec_command(_DFPLAYER_CMD_FILES_IN_FOLDER, 0x00, folder, is_query=True, ack=False, check_error=True)
+        return response.data if response else None
+
+    @property
+    def folder_count(self) -> int | None:
+        """Return the number of folders on the current storage device."""
+        # Don't ask for an ACK message, since on DFROBOT|LISP3 the device responds 
+        # with an ACK message first followed by the query response
+        # wich is in reverse order compared to other queries. 
+        # This is a workaround to avoid having to handle this special case in the main query handling code.
+        # TODO: Check if we can handle this better by improving the query handling code
+        response = self._exec_command(_DFPLAYER_CMD_FOLDERS, is_query=True, ack=False)
+        return response.data if response else None
+
     @property
     def current_file_number_sdcard(self) -> int | None:
         """
