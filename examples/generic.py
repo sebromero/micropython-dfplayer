@@ -3,8 +3,15 @@ from time import sleep_ms
 from dfplayer import DFPlayer, EqualizerMode, PlayerStatus
 
 uart = UART(0, tx=Pin("TX"), rx=Pin("RX")) # Adjust pins as needed
+# uart = UART(0, tx=Pin("D9"), rx=Pin("D8")) # Adjust pins as needed
 busy_pin = Pin("D4") # Optional busy pin
 player = DFPlayer(uart, busy_pin)
+
+software_version = player.software_version
+if software_version:
+    print(f"Player software version: {software_version}")
+else:
+    print("Could not retrieve software version.")
 
 print("Stopping any current playback")
 player.stop()
@@ -15,11 +22,23 @@ player.volume = 40
 
 print("Play first track for 5 seconds")
 player.play()
+
+while player.status is None:
+    print("Waiting for player to report status...")
+    sleep_ms(50)
+
 print(f"Is playing: {player.status == PlayerStatus.PLAYING}")
 sleep_ms(5000)
-print("Setting equalizer to BASS and playing for 5 more seconds")
-player.equalizer_mode = EqualizerMode.BASS
+print("Setting equalizer to POP and playing for 5 more seconds")
+player.equalizer_mode = EqualizerMode.POP
+
+sleep_ms(1000)
+if player.equalizer_mode != EqualizerMode.POP:
+    print(f"Warning: Equalizer mode should be POP but is {player.equalizer_mode}")
 sleep_ms(5000)
+
+print("Setting equalizer back to NORMAL")
+player.equalizer_mode = EqualizerMode.NORMAL
 
 for i in range(5):
     print("Decreasing volume")
@@ -52,6 +71,10 @@ sleep_ms(5000)
 
 print("Play next track for 10 seconds")
 player.next_track()
+sleep_ms(10000)
+
+print("Play previous track for 10 seconds")
+player.previous_track()
 sleep_ms(10000)
 
 print("Playing track 2 from folder 1")

@@ -16,5 +16,5 @@ player.play() # Play first track
 
 print("Waiting for notifications...")
 while True:
-    player.update() # Not necessary if using IRQ mode
+    player.update() # Not necessary if using IRQ mode (see constructor)
     sleep_ms(100)
