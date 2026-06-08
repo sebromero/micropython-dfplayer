@@ -7,3 +7,4 @@ __maintainer__ = "Sebastian Romero"
 from .dfplayer import DFPlayer, EqualizerMode, PlayerStatus
 from .dfrobot import DFRobotPlayer
 from .mh2024k import MH2024KPlayer
+from .random_folder_player import RandomFolderPlayer
