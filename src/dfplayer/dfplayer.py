@@ -593,7 +593,7 @@ class DFPlayer:
         """
         self._exec_command(_DFPLAYER_CMD_RANDOM)
 
-    def play_file_large(self, folder: int, file: int):
+    def play_track_large(self, folder: int, file: int):
         """
         Play the given file (1-4095) in the given folder (1-15).
         This is for use cases where the file number exceeds 255 and cannot 
