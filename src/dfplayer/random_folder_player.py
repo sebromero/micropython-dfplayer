@@ -14,7 +14,7 @@ class RandomFolderPlayer:
         self.player = player
         self.current_folder = None
         self.large_folder = False
-        self.playlist = []
+        self.playlist = None
         self._delay_ms = delay_ms
         self._timer_id = timer_id
         
@@ -62,16 +62,26 @@ class RandomFolderPlayer:
     @property
     def playlist_empty(self):
         """
-        Returns True if all tracks in the current folder have been played.        
+        Returns True if there are no tracks left to play in the current playlist, False otherwise.
         """
-        return len(self.playlist) == 0
+        return self.playlist is None or len(self.playlist) == 0
+
+    def reset(self):
+        """
+        Reset the playlist and current folder.
+        Use this to stop the player from accidentally
+        advancing to the next track if a "done" notification is received 
+        that stems from an interaction with the player outside of this class 
+        (e.g. using the DFPlayer's play/stop methods directly).
+        """
+        self.playlist = None
+        self.current_folder = None
 
     def next_track(self):
         """
         Play the next track in the shuffled playlist. If the playlist is empty, do nothing.
         """
         if self.playlist_empty:
-            print("No more tracks to play in the current folder.")
             return
         
         if self.current_folder is None:
@@ -93,9 +103,12 @@ class RandomFolderPlayer:
 
     def _on_track_finished(self, track_id):
         # A track is done, play the next one
-        print(f"Track with ID {track_id} finished.")
-        if self.playlist_empty:
+        if self.playlist is not None:
+            print(f"Track with ID {track_id} finished.")
+        
+        if self.playlist is not None and self.playlist_empty:
             print("All tracks in the folder have been played.")
+            self.playlist = None
             return
         
         if self._delay_ms:
