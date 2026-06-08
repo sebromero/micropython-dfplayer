@@ -44,7 +44,7 @@ class RandomFolderPlayer:
         return len(self.playlist) == 0
 
     def next_track(self):
-        if len(self.playlist) == 0:
+        if self.done:
             print("No more tracks to play in the current folder.")
             return
         
@@ -65,7 +65,7 @@ class RandomFolderPlayer:
     def _on_track_finished(self, track_id):
         # A track is done, play the next one
         print(f"Track {track_id} finished.")
-        if len(self.playlist) == 0:
+        if self.done:
             print("All tracks in the folder have been played.")
             return
         
@@ -89,14 +89,12 @@ def main():
     uart = UART(0, tx=Pin("TX"), rx=Pin("RX")) # Adjust pins as needed
     busy_pin = Pin("D5") # Optional busy pin
     
-    # TODO: IRQ mode is broken when delay_ms is None, because the notifications may
-    # arrive before the ack messag is process which throws an exception.
     player = DFPlayer(uart=uart, busy_pin=busy_pin, use_irq=True)
     
     # Set volume
     player.volume = 50
 
-    random_player = RandomFolderPlayer(player, delay_ms=None)
+    random_player = RandomFolderPlayer(player, delay_ms=2000)
     
     # Start playback for folder number 1
     random_player.play_folder(6) # Change to the desired folder number
@@ -105,7 +103,7 @@ def main():
         # Main loop to allow for asynchronous frame processing and calling callbacks
         while True:
             # player.update()
-            random_player.update()
+            # random_player.update()
             sleep_ms(50)
 
             if random_player.done and not player.playing:
