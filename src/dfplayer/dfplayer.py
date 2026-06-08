@@ -315,6 +315,12 @@ class EqualizerMode:
 
 class DFPlayer:    
     def __init__(self, uart, busy_pin = None, use_irq = False):
+        self._playing = False
+        self._on_track_finished = None
+        self._on_media_inserted = None
+        self._on_media_ejected = None
+        self._on_device_ready = None
+
         self.uart = uart
         uart.init(baudrate=_DFPLAYER_BAUD, bits=_DFPLAYER_DATA_BITS, parity=_DFPLAYER_PARITY, stop=_DFPLAYER_STOP_BITS, timeout=_DFPLAYER_TIMEOUT_UART_MS)
         self.busy_pin = busy_pin
@@ -325,10 +331,6 @@ class DFPlayer:
         self._frame_reader = FrameReader(uart, use_irq=use_irq)
         self._frame_reader.set_notification_callback(self._handle_notification)
 
-        self._on_track_finished = None
-        self._on_media_inserted = None
-        self._on_media_ejected = None
-        self._on_device_ready = None
 
     def _handle_notification(self, frame):
         cmd = frame.command
@@ -344,8 +346,13 @@ class DFPlayer:
             self._on_track_finished(frame.data) if self._on_track_finished else None
 
     def _on_busy_pin_change(self, pin):
+        previous_value = self._playing
          # High level during playback; Low in pause status and module sleep
         self._playing = pin.value() == 0
+        
+        # Send playback status change notification if the state changed
+        if previous_value != self._playing and self._on_playback_status_change:
+            schedule(self._on_playback_status_change, self._playing)
 
     def _calculate_checksum(self, command, data_high, data_low, ack):
         frame_check_init = -(_DFPLAYER_VERSION + _DFPLAYER_LEN)
@@ -445,6 +452,15 @@ class DFPlayer:
 
         return cmd_response
 
+    def on_playback_status_change(self, callback):
+        """
+        Register a callback to be called when the playback status changes (play, pause, stop).
+        Requires the busy pin to be connected since the DFPlayer does not send notifications for playback status changes.
+        """
+        if not self.busy_pin:
+            raise RuntimeError("Busy pin must be connected to use playback status change notifications")
+        self._on_playback_status_change = callback
+
     def on_track_finished(self, callback):
         """Register a callback to be called when a track finishes playing."""
         self._on_track_finished = callback
@@ -502,7 +518,13 @@ class DFPlayer:
         self._exec_command(_DFPLAYER_CMD_VOLUME_DEC)
     
     def play_track(self, folder, track):
-        """Play the given track number from the given folder."""
+        """
+        Play the given track number from the given folder.
+        The format should be e.g. 02/123-Track.mp3, 
+        where 02 is the folder number and 123 is the track number.
+        If the tracks' name doesn't begin with such number, an error is thrown.
+        Upon completion of the track, the playback will stop.
+        """
         if folder < 1 or folder > _DFPLAYER_MAX_FOLDER:
             raise ValueError("Folder number must be between 1 and 99")
         if track < 1 or track > _DFPLAYER_MAX_FILE:
@@ -513,13 +535,18 @@ class DFPlayer:
         """
         Play the given track number from the flattened file list.
         The order of tracks is determined by the underlying file table.
+        TODO: Find out if all files are named e.g. 001-Track.mp3 if that 
+        determines the order instead.
         """
         if track_number < 1 or track_number > 65535:
             raise ValueError("Track number must be between 1 and 65535")
         self._exec_command(_DFPLAYER_CMD_PLAY_TRACK, track_number >> 8, track_number & 0xFF, check_error=True)
 
     def play_from_mp3_folder(self, track_number):
-        """Play the given track number (0001-65535) from the "MP3" folder."""
+        """
+        Play the given track number (0001-65535) from the "MP3" folder.
+        The formate should be e.g. MP3/0001-Track.mp3, where 0001 is the track number.
+        """
         if track_number < 0 or track_number > _DFPLAYER_MAX_MP3_FILE:
             raise ValueError("Track number must be between 0 and 9999")
         self._exec_command(_DFPLAYER_CMD_PLAY_FROM_MP3, track_number >> 8, track_number & 0xFF, check_error=True)
@@ -538,8 +565,10 @@ class DFPlayer:
         """
         Play a track from the custom advert folder (1-9).
         The advert folder is a special folder that can be used to store short audio clips.
-        The structure should be e.g. ADVERT2/001-Beep.mp3
-        Starts/resumes playback after advertisment is done.
+        The structure should be e.g. ADVERT2/001-Beep.mp3. 
+        The arguments would be folder=2, track=1 in that case.
+        On DFRobot's DFPlayer: Raises _DFPLAYER_ERROR_INSERTION_CMD if playback is not active.
+        On MH2024K/GD3200: Resumes playback afterwards no matter if playback was active or not.
         """
         if folder < 1 or folder > 9:
             raise ValueError("Advert folder number must be between 1 and 9")
@@ -548,7 +577,11 @@ class DFPlayer:
         self._exec_command(_DFPLAYER_CMD_ADVERT_FOLDER, folder, track, check_error=True)
 
     def play_random(self):
-        """Start playing all tracks from the current source in random order."""
+        """
+        Start playing all tracks from the current source in random order.
+        On DFRobot's DFPlayer, it starts always with the same track but subsequent tracks are random. 
+        On MH2024K/GD3200, it seems to be completely random including the first track.
+        """
         self._exec_command(_DFPLAYER_CMD_RANDOM)
 
     def play_file_large(self, folder: int, file: int):
@@ -556,6 +589,8 @@ class DFPlayer:
         Play the given file (1-4095) in the given folder (1-15).
         This is for use cases where the file number exceeds 255 and cannot 
         be specified with the regular play_file command.
+        The format should be e.g. 02/0001-Track.mp3, where 
+        02 is the folder number and 0001 is the track number.
 
         Parameters:
             folder (int): The folder number (1-15)
@@ -598,6 +633,8 @@ class DFPlayer:
         """
         Start repeat-playing the given folder (1-99)        
         Tracks are played in the order they were added to the file table.
+        The format should be e.g. 01/001-Track.mp3, where 
+        01 is the folder number and 001 is the track number.
         """
         if folder < 1 or folder > _DFPLAYER_MAX_FOLDER:
             raise ValueError("Folder number must be between 1 and 99")
