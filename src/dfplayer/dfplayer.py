@@ -269,19 +269,7 @@ class FrameReader():
         If await_frames > 0, wait until at least that many frames are available or timeout occurs.
         If timeout_ms is None, wait indefinitely.
         If await_frames is 0, process available frames without waiting (timeout does not apply).
-        In IRQ mode, frames are read in the IRQ handler hence this function always returns 0.
         """
-        if self._use_irq:
-            start_time = ticks_ms()
-            while True:
-                timeout_elapsed = timeout_ms is not None and (ticks_ms() - start_time) >= timeout_ms
-                frequested_frames_received = len(self._frames) >= await_frames
-                
-                if timeout_elapsed or frequested_frames_received:
-                    break
-                sleep_ms(10) # Give some time for IRQ handler to process incoming data
-                    
-            return 0 # In IRQ mode, frames are read in the IRQ handler
         return self._process_frames(await_frames, timeout_ms)
             
     def available_frames(self):
