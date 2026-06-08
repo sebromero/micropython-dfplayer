@@ -2,7 +2,7 @@
 
 from micropython import const, schedule
 from machine import Pin, UART
-from time import sleep_ms, ticks_ms
+from time import sleep_ms, ticks_ms, ticks_diff
 import struct
 from collections import deque
 
@@ -320,6 +320,9 @@ class DFPlayer:
         self._on_media_inserted = None
         self._on_media_ejected = None
         self._on_device_ready = None
+        self._on_playback_status_change = None
+        self._last_completed_track_time = 0
+        self._last_completed_track = -1
 
         self.uart = uart
         uart.init(baudrate=_DFPLAYER_BAUD, bits=_DFPLAYER_DATA_BITS, parity=_DFPLAYER_PARITY, stop=_DFPLAYER_STOP_BITS, timeout=_DFPLAYER_TIMEOUT_UART_MS)
@@ -343,13 +346,19 @@ class DFPlayer:
         elif cmd in [_DFPLAYER_NOTIFY_DONE_USB, _DFPLAYER_NOTIFY_DONE_SDCARD, _DFPLAYER_NOTIFY_DONE_FLASH]:
             # We consolidate all "done" notifications into a single callback
             # since only one source can be active at a time anyway.
-            self._on_track_finished(frame.data) if self._on_track_finished else None
+            
+            # DFRobot variant sends the "done" notification twice, so we debounce it here
+            now = ticks_ms()
+            if ticks_diff(now, self._last_completed_track_time) > 500 or self._last_completed_track != frame.data:
+                self._last_completed_track_time = now
+                self._last_completed_track = frame.data
+                self._on_track_finished(frame.data) if self._on_track_finished else None
 
     def _on_busy_pin_change(self, pin):
         previous_value = self._playing
          # High level during playback; Low in pause status and module sleep
         self._playing = pin.value() == 0
-        
+
         # Send playback status change notification if the state changed
         if previous_value != self._playing and self._on_playback_status_change:
             schedule(self._on_playback_status_change, self._playing)
