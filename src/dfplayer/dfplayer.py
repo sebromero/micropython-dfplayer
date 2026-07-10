@@ -1,328 +1,658 @@
 # Author: Sebastian Romero
 
-from micropython import const
-from machine import Pin
-from time import sleep_ms
+from micropython import const, schedule
+from machine import Pin, UART
+from time import sleep_ms, ticks_ms, ticks_diff
 import struct
+from collections import deque
 
-# Macros
-DFPLAYER_BOOTUP_TIME_MS = const(3000)  # Boot up of the device takes 1.5 to 3 secs.
+# CONFIG
+_DFPLAYER_BOOTUP_TIME_MS = const(3000)  # Boot up of the device takes 1.5 to 3 secs.
+_DFPLAYER_TIMEOUT_UART_MS = const(100)  # Default timeout waiting for UART data in milliseconds.
 
-DFPLAYER_TIMEOUT_MS = const(100)  # Timeout waiting for a replay in milliseconds.
-# TODO Depends on device. Make it configurable.
-# DFPLAYER_SEND_DELAY_MS = const(100)  # Wait 100ms after a cmd to work around hw bug.
-DFPLAYER_SEND_DELAY_MS = const(350)  # Wait 100ms after a cmd to work around hw bug.
-DFPLAYER_RETRIES = const(5)  # How often to retry a command on timeout.
-DFPLAYER_MAX_VOLUME = const(30)  # Maximum supported volume.
-DFPLAYER_MAX_FOLDER = const(99)  # Highest supported folder number.
-DFPLAYER_MAX_MP3_FILE = const(9999)  # Highest supported file number in the "MP3" folder.
-DFPLAYER_MAX_ADVERT_FILE = const(9999)  # Highest supported file number in the "ADVERT" folder.
-DFPLAYER_LOWEST_QUERY = const(0x40)  # Query commands are 0x40 or higher.
+_DFPLAYER_MAX_VOLUME = const(30)  # Maximum supported volume.
+_DFPLAYER_MAX_FOLDER = const(99)  # Highest supported folder number.
+_DFPLAYER_MAX_FILE = const(255)  # Highest supported file number in the "MP3" folder.
+_DFPLAYER_MAX_MP3_FILE = const(65536)  # Highest supported file number in the "MP3" folder.
+_DFPLAYER_MAX_ADVERT_FILE = const(65536)  # Highest supported file number in the "ADVERT" folder.
 
 # Constants used in frames sent to the DFPlayer Mini
-DFPLAYER_FRAME_SIZE = const(10)  # Size of a frame sent to the DFPlayer Mini.
-DFPLAYER_START = const(0x7e)  # Start symbol.
-DFPLAYER_VERSION = const(0xff)  # Value to use in version field.
-DFPLAYER_LEN = const(0x06)  # Length of a frame. (Command length)
-DFPLAYER_NO_ACK = const(0x00)  # No acknowledgement of CMD required.
-DFPLAYER_ACK = const(0x01)  # Acknowledgement of CMD required.
-DFPLAYER_END = const(0xef)  # End symbol.
+_DFPLAYER_FRAME_SIZE = const(10)  # Size of a frame sent to the DFPlayer Mini.
+_DFPLAYER_START = const(0x7e)  # Start symbol.
+_DFPLAYER_VERSION = const(0xff)  # Value to use in version field.
+_DFPLAYER_LEN = const(0x06)  # Length of a frame. (Command length)
+_DFPLAYER_NO_ACK = const(0x00)  # No acknowledgement of CMD required.
+_DFPLAYER_ACK = const(0x01)  # Acknowledgement of CMD required.
+_DFPLAYER_END = const(0xef)  # End symbol.
 
 # UART settings of the DFPlayer Mini
-DFPLAYER_BAUD = const(9600)  # Symbol rate of the DFPlayer mini.
-DFPLAYER_DATA_BITS = const(8)  # The DFPlayer uses 8 data bits.
-DFPLAYER_PARITY = const(None)  # The DFPlayer does not use a parity bit.
-DFPLAYER_STOP_BITS = const(1)  # The DFPlayer uses 1 stop bit.
-
-# Commands supported by the DFPlayer Mini
-DFPLAYER_CMD_NEXT = const(0x01)  # Start playing the next song.
-DFPLAYER_CMD_PREV = const(0x02)  # Start playing the next song.
-DFPLAYER_CMD_VOLUME_INC = const(0x04)  # Increase volume.
-DFPLAYER_CMD_VOLUME_DEC = const(0x05)  # Decrease volume.
-DFPLAYER_CMD_SET_VOLUME = const(0x06)  # Set the volume to the given level.
-DFPLAYER_CMD_SET_EQUALIZER = const(0x07)  # Set the equalizer to the given setting.
-DFPLAYER_CMD_SET_PLAYBACK_MODE = const(0x08)  # Set the playback mode.
-DFPLAYER_CMD_SET_SOURCE = const(0x09)  # Set the source to play files from.
-DFPLAYER_CMD_STANDBY_ENTER = const(0x0a)  # Enter low power mode.
-DFPLAYER_CMD_STANDBY_EXIT = const(0x0b)  # Exit low power mode, back to normal mode.
-DFPLAYER_CMD_RESET = const(0x0c)  # Reset the DFPlayer Mini.
-DFPLAYER_CMD_PLAY = const(0x0d)  # Start playing the selected file.
-DFPLAYER_CMD_PAUSE = const(0x0e)  # Pause the playback.
-DFPLAYER_CMD_FILE = const(0x0f)  # Play the given file.
-DFPLAYER_CMD_PLAY_FROM_MP3 = const(0x12)  # Play the given file (1-9999) from the folder "MP3"
-DFPLAYER_CMD_PLAY_ADVERT = const(0x13)  # Play the given file (1-9999) from the folder "ADVERT", resume current playback afterwards.
-DFPLAYER_CMD_ABORT_ADVERT = const(0x15)  # Play the given file (1-9999) from the folder "ADVERT", resume current playback afterwards.
-DFPLAYER_CMD_REPEAT_FOLDER = const(0x17)  # Start repeat-playing the given folder (1-99)
-DFPLAYER_CMD_RANDOM = const(0x18)  # Start playing all files in random order.
-DFPLAYER_CMD_REPEAT = const(0x19)  # 0 = repeat currently played file, 1 = stop repeating
-DFPLAYER_CMD_GET_STATUS = const(0x42)  # Retrieve the current status.
-DFPLAYER_CMD_GET_VOLUME = const(0x43)  # Retrieve the current volume.
-DFPLAYER_CMD_GET_EQUALIZER = const(0x44)  # Retrieve the current equalizer setting.
-DFPLAYER_CMD_GET_MODE = const(0x45)  # Retrieve the current playback mode.
-DFPLAYER_CMD_GET_VERSION = const(0x46)  # Retrieve the device's software version.
-DFPLAYER_CMD_FILES_USB = const(0x47)  # Get the total number of files on USB storage.
-DFPLAYER_CMD_FILES_SDCARD = const(0x48)  # Get the total number of files on the SD card.
-DFPLAYER_CMD_FILES_FLASH = const(0x49)  # Get the total number of files on NOR flash.
-DFPLAYER_CMD_FILENO_USB = const(0x4b)  # Get the currently select file number on the USB storage.
-DFPLAYER_CMD_FILENO_SDCARD = const(0x4c)  # Get the currently select file number on the SD-Card.
-DFPLAYER_CMD_FILENO_FLASH = const(0x4d)  # Get the currently select file number on the NOR flash.
+_DFPLAYER_BAUD = const(9600)  # Symbol rate of the DFPlayer mini.
+_DFPLAYER_DATA_BITS = const(8)  # The DFPlayer uses 8 data bits.
+_DFPLAYER_PARITY = const(None)  # The DFPlayer does not use a parity bit.
+_DFPLAYER_STOP_BITS = const(1)  # The DFPlayer uses 1 stop bit.
 
 # Classes of messages received from the DFPlayer
-DFPLAYER_CLASS_MASK = const(0xf0)  # Use this mask to get the class from a response code.
-DFPLAYER_CLASS_NOTIFY = const(0x30)  # Message is an event notification (unrelated to any command)
-DFPLAYER_CLASS_RESPONSE = const(0x40)  # Message is a response to the most recent command.
+_DFPLAYER_CLASS_MASK = const(0xf0)  # Use bits 4-7 to get the class from a response code.
+_DFPLAYER_CLASS_NOTIFY = const(0x30)  # Message is an event notification (unrelated to any command)
 
-# Notification codes sent by the DFPlayer Mini
-DFPLAYER_NOTIFY_INSERT = const(0x3a)  # A USB storage device or an SD card was inserted.
-DFPLAYER_NOTIFY_EJECT = const(0x3b)  # A USB storage device or an SD card was ejected.
-DFPLAYER_NOTIFY_DONE_USB = const(0x3c)  # Completed playing the indicated track from USB storage.
-DFPLAYER_NOTIFY_DONE_SDCARD = const(0x3d)  # Completed playing the indicated track from SD card.
-DFPLAYER_NOTIFY_DONE_FLASH = const(0x3e)  # Completed playing the indicated track from flash.
-DFPLAYER_NOTIFY_READY = const(0x3f)  # The DFPlayer is ready.
-
-# Bitmasks identifying the playback sources in the ready notification
-DFPLAYER_MASK_USB = const(0x01)  # USB stick is connected.
-DFPLAYER_MASK_SDCARD = const(0x02)  # SD-Card is connected.
-DFPLAYER_MASK_PC = const(0x04)  # Unclear, has something to do with debugging.
-DFPLAYER_MASK_FLASH = const(0x08)  # NOR flash is connected.
-
-# Response codes sent by the DFPlayer Mini
-DFPLAYER_RESPONSE_ERROR = const(0x40)  # While processing the most recent command an error occurred.
-DFPLAYER_RESPONSE_OK = const(0x41)  # Last command succeeded.
-
-# Error codes sent as parameter of error messages
-DFPLAYER_ERROR_BUSY = const(0x00)  # Module is busy.
-DFPLAYER_ERROR_FRAME = const(0x01)  # Received incomplete frame.
-DFPLAYER_ERROR_FCS = const(0x02)  # Frame check sequence of last frame didn't match.
-DFPLAYER_ERROR_NO_SUCH_FILE = const(0x06)  # File/folder selected for playback (command 0x06) does not exit.
+# Notification codes
+# Note: Done frames contain the track number in the data field
+_DFPLAYER_NOTIFY_INSERT = const(0x3a)  # A USB storage device or an SD card was inserted.
+_DFPLAYER_NOTIFY_EJECT = const(0x3b)  # A USB storage device or an SD card was ejected.
+_DFPLAYER_NOTIFY_DONE_USB = const(0x3c)  # Completed playing the indicated track from USB storage.
+_DFPLAYER_NOTIFY_DONE_SDCARD = const(0x3d)  # Completed playing the indicated track from SD card.
+_DFPLAYER_NOTIFY_DONE_FLASH = const(0x3e)  # Completed playing the indicated track from flash.
+_DFPLAYER_NOTIFY_INIT = const(0x3f)  # Ready notification after initialization.
 
 # Device identifiers in insert/eject notifications
 DFPLAYER_DEVICE_USB = const(0x01)  # A USB storage device was inserted/ejected.
 DFPLAYER_DEVICE_SDCARD = const(0x02)  # An SD card was inserted/ejected.
 
-# Status bitmasks
-DFPLAYER_STATUS_STOPPED = const(0x00) # The DFPlayer is currently stopped e.g. done playing a song.
-DFPLAYER_STATUS_PLAYING = const(0x01) # The DFPlayer is currently playing a song.
-DFPLAYER_STATUS_PAUSED  = const(0x02) # The DFPlayer is paused.
+# Bitmasks identifying the playback sources in the ready notification
+DFPLAYER_SOURCE_USB = const(0x01)  # USB stick is connected.
+DFPLAYER_SOURCE_SDCARD = const(0x02)  # SD-Card is connected.
+DFPLAYER_SOURCE_USB_SDCARD = const(0x03)  # Both USB stick and SD-Card are connected.
+DFPLAYER_SOURCE_PC = const(0x04)  # Unclear, has something to do with debugging.
+DFPLAYER_SOURCE_FLASH = const(0x08)  # NOR flash is connected.
 
-# Flags to store info about the driver state
-DFPLAYER_FLAG_NO_ACK_BUG = const(0x01)  # The next command will be affected by the no-ACK bug.
+# Status bitmasks
+_DFPLAYER_STATUS_MASK = const(0x0f)  # Use bits 0-3 to get the status from a response code.
+_DFPLAYER_STATUS_STOPPED = const(0x00) # The DFPlayer is currently stopped e.g. done playing a song.
+_DFPLAYER_STATUS_PLAYING = const(0x01) # The DFPlayer is currently playing a song.
+_DFPLAYER_STATUS_PAUSED  = const(0x02) # The DFPlayer is paused.
+
+# Response codes sent by the DFPlayer
+_DFPLAYER_RESPONSE_ERROR = const(0x40)  # While processing the most recent command an error occurred.
+_DFPLAYER_RESPONSE_ACK = const(0x41)  # Last command succeeded.
+
+# Error codes sent as parameter of error messages
+# Warning: The documentation of DFRobot's DFPlayer seems to be wrong/incomplete here
+_DFPLAYER_ERROR_BUSY = const(0x01)  # Module is busy (initialization not done).
+_DFPLAYER_ERROR_SLEEPING = const(0x02)  # Module is in sleep mode (only on specific devices).
+_DFPLAYER_ERROR_FRAME = const(0x03)  # Received incomplete frame over UART.
+_DFPLAYER_ERROR_FCS = const(0x04)  # Checksum of last frame incorrect.
+_DFPLAYER_ERROR_OUT_OF_RANGE = const(0x05)  # Requested track/folder is out of range.
+_DFPLAYER_ERROR_NO_SUCH_FILE = const(0x06)  # File/folder selected for playback (command 0x06) does not exist.
+_DFPLAYER_ERROR_INSERTION_CMD = const(0x07)  # inserting operation only can be donewhen a track is being played
+_DFPLAYER_ERROR_SD_READ = const(0x08)  # SD-card reading failed (SD-card pulled out or damaged).
+_DFPLAYER_ERROR_SLEEP_MODE = const(0x0A)  # Error while entering sleep mode (only on specific devices).
+
+# Common Commands
+_DFPLAYER_CMD_NEXT = const(0x01)  # Start playing the next song.
+_DFPLAYER_CMD_PREV = const(0x02)  # Start playing the next song.
+_DFPLAYER_CMD_PLAY_TRACK = const(0x03)  # Play the given track. (DFROBOT: 0-2999) (MH2024/GD3200: 0-65535)
+_DFPLAYER_CMD_VOLUME_INC = const(0x04)  # Increase volume.
+_DFPLAYER_CMD_VOLUME_DEC = const(0x05)  # Decrease volume.
+_DFPLAYER_CMD_SET_VOLUME = const(0x06)  # Set the volume to the given level. (0-30)
+_DFPLAYER_CMD_SET_EQUALIZER = const(0x07)  # Set the equalizer to the given setting. (0-5)
+_DFPLAYER_CMD_SINGLE_TRACK_LOOP = const(0x08)  # Loops single track (0-65535) (Also on DFRobot's DFPlayer)
+_DFPLAYER_CMD_SET_SOURCE = const(0x09)  # Set the source to play files from.
+_DFPLAYER_CMD_STANDBY_ENTER = const(0x0a)  # Enter low power mode.
+_DFPLAYER_CMD_RESET = const(0x0c)  # Reset the DFPlayer Mini.
+_DFPLAYER_CMD_PLAY = const(0x0d)  # Start playing the selected file.
+_DFPLAYER_CMD_PAUSE = const(0x0e)  # Pause the playback.
+_DFPLAYER_CMD_PLAY_FILE = const(0x0f)  # Play the given file (1-255) in the given folder (1-99)
+_DFPLAYER_CMD_REPEAT_ALL = const(0x11)  # Start/stop repeat-playing the whole source. 1=loop 0=stop
+_DFPLAYER_CMD_PLAY_FROM_MP3 = const(0x12)  # Play the given file (1-9999) from the folder "MP3"
+_DFPLAYER_CMD_PLAY_ADVERT = const(0x13)  # Play the given file (1-9999) from the folder "ADVERT", resume current playback afterwards.
+_DFPLAYER_CMD_FILE_LARGE = const(0x14)  # Play the given file (1-4095) in the given folder (1-15).
+_DFPLAYER_CMD_ABORT_ADVERT = const(0x15)  # Abort advert playback and resume current playback.
+_DFPLAYER_CMD_STOP = const(0x16)  # Stop playback.
+_DFPLAYER_CMD_REPEAT_FOLDER = const(0x17)  # Start repeat-playing the given folder (1-99)
+_DFPLAYER_CMD_RANDOM = const(0x18)  # Start playing all files in random order.
+_DFPLAYER_CMD_MUTE = const(0x1a)  # Mute/unmute the audio output. 0=unmute, 1=mute
+_DFPLAYER_CMD_ADVERT_FOLDER = const(0x25) # Play from advert folder 1-9
+_DFPLAYER_CMD_GET_STATUS = const(0x42)  # Retrieve the current status.
+_DFPLAYER_CMD_GET_VOLUME = const(0x43)  # Retrieve the current volume.
+_DFPLAYER_CMD_GET_EQUALIZER = const(0x44)  # Retrieve the current equalizer setting.
+_DFPLAYER_CMD_GET_PLAYBACK_MODE = const(0x45)  # Retrieve the current playback mode.
+_DFPLAYER_CMD_GET_VERSION = const(0x46)  # Retrieve the device's software version.
+
+# Commands to query files
+# Warning: The documentation of DFRobot's DFPlayer DFROBOT|LISP3 mixes up those commands
+# It follows the documentation of the MH2024K/GD3200 instead
+_DFPLAYER_CMD_FILES_USB = const(0x47)  # Get the total number of files on USB storage.
+_DFPLAYER_CMD_FILES_SDCARD = const(0x48)  # Get the total number of files on the SD card.
+_DFPLAYER_CMD_FILES_FLASH = const(0x49)  # Get the total number of files on the internal flash.
+_DFPLAYER_CMD_FILENO_USB = const(0x4b)  # Get the currently select file number on the USB storage.
+_DFPLAYER_CMD_FILENO_SDCARD = const(0x4c)  # Get the currently select file number on the SD-Card.    
+_DFPLAYER_CMD_FILENO_FLASH = const(0x4d)  # Get the currently select file number on the NOR flash.
+_DFPLAYER_CMD_FILES_IN_FOLDER = const(0x4e)  # Get the number of files in the current folder.
+_DFPLAYER_CMD_FOLDERS = const(0x4f)  # Get the number of folders.
+
+class Frame():
+    def __init__(self, raw_data):
+        if raw_data is None or len(raw_data) != _DFPLAYER_FRAME_SIZE:
+            raise ValueError(f"Frame data must be exactly {_DFPLAYER_FRAME_SIZE} bytes")
+        
+        if raw_data[0] != _DFPLAYER_START:
+            raise ValueError(f"Invalid frame start byte ({hex(raw_data[0])}) in frame: {self._frame_as_string(raw_data)}")
+
+        if  raw_data[1] != _DFPLAYER_VERSION:
+            raise ValueError(f"Invalid frame version byte ({hex(raw_data[1])}) in frame: {self._frame_as_string(raw_data)}")
+        
+        if raw_data[2] != _DFPLAYER_LEN:
+            raise ValueError(f"Invalid frame length byte ({hex(raw_data[2])}) in frame: {self._frame_as_string(raw_data)}")
+        
+        if raw_data[9] != _DFPLAYER_END:
+            raise ValueError(f"Invalid frame end byte ({hex(raw_data[9])}) in frame: {self._frame_as_string(raw_data)}")    
+
+        self.command = raw_data[3]
+        self.data = struct.unpack('>H', raw_data[5:7])[0]
+        self.raw_data = raw_data
+
+    def _frame_as_string(self, raw_data):
+        return " ".join([hex(b) for b in raw_data])
+
+    def __str__(self):
+        return self._frame_as_string(self.raw_data)
+    
+    @property
+    def is_notification(self):
+        """Return True if the frame is a notification from the DFPlayer."""
+        return (self.command & _DFPLAYER_CLASS_MASK) == _DFPLAYER_CLASS_NOTIFY
+    
+    @property
+    def is_error(self):
+        """Return True if the frame is an error response from the DFPlayer."""
+        return self.command == _DFPLAYER_RESPONSE_ERROR
+    
+    @property
+    def is_ack(self):
+        """Return True if the frame is an ACK response from the DFPlayer."""
+        return self.command == _DFPLAYER_RESPONSE_ACK
+
+class FrameReader():
+    def __init__(self, uart, use_irq = False):
+        """
+        Initialize the FrameReader.
+        Parameters:
+            uart (UART): The UART instance to read frames from.
+            use_irq (bool): Whether to use IRQ for reading frames. Default is False.
+                            Note: On ESP32 it uses Timer(0) which makes it unavailable for other uses.
+        """
+        self.uart = uart
+        self._frames = deque([], 10)  # Store up to 10 frames
+        self._on_notification = None
+        self._use_irq = use_irq
+        
+        if use_irq:        
+            # IRQ_RXIDLE is not available on all ports (e.g. CC3200, NRF), use IRQ_RX in that case
+            trigger_event = UART.IRQ_RXIDLE if hasattr(UART, 'IRQ_RXIDLE') else UART.IRQ_RX
+            uart.irq(handler= lambda _: schedule(self._update_from_irq, None), trigger=trigger_event)
+
+    def _read_frame(self, timeout_ms = 1000) -> Frame | None:
+        if self.uart.any() == 0:
+            # No data available
+            return None
+
+        start_time = ticks_ms()
+
+        while True:
+            if timeout_ms is not None and (ticks_ms() - start_time) >= timeout_ms:
+                return None
+            
+            next_byte = self.uart.read(1)
+            if next_byte is None:
+                sleep_ms(10)
+                continue
+            if next_byte[0] == _DFPLAYER_START:
+                break
+            else:
+                print(f"Discarding spurious byte: {hex(next_byte[0])}")
+
+        # Wait for the rest of the frame
+        while self.uart.any() < _DFPLAYER_FRAME_SIZE - 1:
+            if timeout_ms is not None and (ticks_ms() - start_time) >= timeout_ms:
+                return None
+            sleep_ms(10)
+
+        data = self.uart.read(_DFPLAYER_FRAME_SIZE - 1)  # Read the rest of the frame
+        return Frame(bytes([_DFPLAYER_START]) + data)
+
+    def set_notification_callback(self, callback : callable):
+        self._on_notification = callback
+
+    def clear(self):
+        """Clear all frames from the internal buffer."""
+        while len(self._frames) > 0:
+            f = self._frames.popleft()
+            print(f"DEBUG: Discarding frame during clear. Code: {hex(f.command)} Data: {hex(f.data)}")
+
+    def _update_from_irq(self, _):
+        """
+        Updates the frame buffer from UART triggered by IRQ as soon as data is available.        
+        This function is scheduled from the IRQ handler and does not run in IRQ context.
+        """
+        if self.uart.any() >= _DFPLAYER_FRAME_SIZE:
+            self._process_frames()
+
+    def _process_frames(self, await_frames = 0, timeout_ms = 1000) -> int:
+        """
+        Read frames from the UART and store them in the internal buffer.
+        If await_frames > 0, wait until at least that many frames are available or timeout occurs.
+        If timeout_ms is None, wait indefinitely.
+        
+        Parameters:
+            await_frames (int): Number of frames to wait for before returning. Default is 0 (no wait).
+            timeout_ms (int | None): Maximum time to wait in milliseconds. None means wait indefinitely
+
+        Returns:
+            int: Number of frames added to the internal buffer during this call.
+        """
+        start_time = ticks_ms()
+        frames_added = 0
+
+        while True:
+            # Check for timeout
+            if timeout_ms is not None and (ticks_ms() - start_time) >= timeout_ms:
+                return frames_added
+                        
+            f = self._read_frame()
+            if f is None:
+                # Wait until we have at least requested amount of frames
+                if len(self._frames) < await_frames:
+                    sleep_ms(10)
+                    continue
+                return frames_added
+            if f.is_notification:
+                if self._on_notification:
+                    self._on_notification(f)
+                # Notifications are not stored in the buffer
+                continue
+            self._frames.append(f)
+            frames_added += 1
+
+    def update(self, await_frames = 0, timeout_ms = 1000) -> int:
+        """
+        Ensures that at least requested amount of frames are available in the internal buffer.
+        If await_frames > 0, wait until at least that many frames are available or timeout occurs.
+        If timeout_ms is None, wait indefinitely.
+        If await_frames is 0, process available frames without waiting (timeout does not apply).
+        """
+        return self._process_frames(await_frames, timeout_ms)
+            
+    def available_frames(self):
+        return len(self._frames)
+    
+    def pop_frame(self) -> Frame | None:
+        if len(self._frames) == 0:
+            return None
+        return self._frames.popleft()
+    
+    def peek_frame(self) -> Frame | None:
+        if len(self._frames) == 0:
+            return None
+        return self._frames[0]
 
 class PlayerStatus:
+    # Arbitrary values representing player status
     STOPPED = 0
     PLAYING = 1
     PAUSED = 2
 
 class EqualizerMode:
+    # These numbers directly map to 
+    # the DFPlayer equalizer settings
     NORMAL = 0
     POP = 1
     ROCK = 2
     JAZZ = 3
     CLASSIC = 4
-    BASS = 5
+    BASS = 5 # Seems unsupported on DFRobot's DFPlayer
 
-class PlaybackMode:
-    REPEAT = 0
-    FOLDER_REPEAT = 1
-    SINGLE_REPEAT = 2
-    RANDOM = 3
+class DFPlayer:    
+    def __init__(self, uart, busy_pin = None, use_irq = False):
+        self._playing = False
+        self._on_track_finished = None
+        self._on_media_inserted = None
+        self._on_media_ejected = None
+        self._on_device_ready = None
+        self._on_playback_status_change = None
+        self._last_completed_track_time = 0
+        self._last_completed_track = -1
 
-class PlaybackSource:
-    USB = 0
-    SD_CARD = 1
-    AUX = 2
-    SLEEP = 3
-    FLASH = 4
-
-class DFPlayer:
-    def __init__(self, uart, busy_pin = None):
         self.uart = uart
-        uart.init(baudrate=DFPLAYER_BAUD, bits=DFPLAYER_DATA_BITS, parity=DFPLAYER_PARITY, stop=DFPLAYER_STOP_BITS, timeout=DFPLAYER_TIMEOUT_MS)
+        uart.init(baudrate=_DFPLAYER_BAUD, bits=_DFPLAYER_DATA_BITS, parity=_DFPLAYER_PARITY, stop=_DFPLAYER_STOP_BITS, timeout=_DFPLAYER_TIMEOUT_UART_MS)
         self.busy_pin = busy_pin
         if busy_pin:
             self.busy_pin.init(Pin.IN)
             busy_pin.irq(trigger=Pin.IRQ_RISING | Pin.IRQ_FALLING, handler=self._on_busy_pin_change)
+        
+        self._frame_reader = FrameReader(uart, use_irq=use_irq)
+        self._frame_reader.set_notification_callback(self._handle_notification)
+
+
+    def _handle_notification(self, frame):
+        cmd = frame.command
+        if cmd == _DFPLAYER_NOTIFY_INIT:
+            self._on_device_ready(frame.data) if self._on_device_ready else None
+        elif cmd == _DFPLAYER_NOTIFY_INSERT:
+            self._on_media_inserted(frame.data) if self._on_media_inserted else None
+        elif cmd == _DFPLAYER_NOTIFY_EJECT:
+            self._on_media_ejected(frame.data) if self._on_media_ejected else None
+        elif cmd in [_DFPLAYER_NOTIFY_DONE_USB, _DFPLAYER_NOTIFY_DONE_SDCARD, _DFPLAYER_NOTIFY_DONE_FLASH]:
+            # We consolidate all "done" notifications into a single callback
+            # since only one source can be active at a time anyway.
+            
+            # DFRobot variant sends the "done" notification twice, so we debounce it here
+            now = ticks_ms()
+            if ticks_diff(now, self._last_completed_track_time) > 500 or self._last_completed_track != frame.data:
+                self._last_completed_track_time = now
+                self._last_completed_track = frame.data
+                self._on_track_finished(frame.data) if self._on_track_finished else None
 
     def _on_busy_pin_change(self, pin):
+        previous_value = self._playing
          # High level during playback; Low in pause status and module sleep
         self._playing = pin.value() == 0
 
-    @property
-    def playing(self):
-        """Return True if the DFPlayer is currently playing a song."""
-        if self.busy_pin: # If we have a busy pin, use it
-            return self._playing
-        return self.status == PlayerStatus.PLAYING
+        # Send playback status change notification if the state changed
+        if previous_value != self._playing and self._on_playback_status_change:
+            schedule(self._on_playback_status_change, self._playing)
 
-    def _read_data(self):
-        self.uart.flush() # Clear the buffer
+    def _calculate_checksum(self, command, data_high, data_low, ack):
+        frame_check_init = -(_DFPLAYER_VERSION + _DFPLAYER_LEN)
+        ack_flag = _DFPLAYER_ACK if ack else _DFPLAYER_NO_ACK
+        checksum = frame_check_init - (command + ack_flag + data_low + data_high)
+        return checksum >> 8, checksum & 0xFF
 
-        if not self.uart.any():
-            return None, None
-        
-        buf = self.uart.read(DFPLAYER_FRAME_SIZE)
-        if buf is None or len(buf) != DFPLAYER_FRAME_SIZE:
-            return None, None        
-        
-        if buf[0] == DFPLAYER_START and buf[1] == DFPLAYER_VERSION and buf[2] == DFPLAYER_LEN and buf[9] == DFPLAYER_END:
-            cmd = buf[3]
-            data = struct.unpack('>H', buf[5:7])[0]
-            return (cmd, data)
-        
-        # TODO: Handle invalid frames
-        #return None
-        raise RuntimeError("Invalid frame received")
-
-    def _send_command(self, command, data_high = 0x0, data_low = 0x0):
+    def _send_command(self, command, data_high = 0x0, data_low = 0x0, ack = True):
         # Ensure command is only one byte long
         if command > 0xFF:
             raise ValueError("Command must be a single byte")
-        frame_check_init = -(DFPLAYER_VERSION + DFPLAYER_LEN)
-        checksum = frame_check_init - (command + DFPLAYER_ACK + data_low + data_high)
-        high_byte, low_byte = checksum >> 8, checksum & 0xFF
-        frame = [DFPLAYER_START, DFPLAYER_VERSION, DFPLAYER_LEN, command, DFPLAYER_ACK, data_high, data_low, high_byte, low_byte, DFPLAYER_END]        
+        if data_high > 0xFF or data_low > 0xFF:
+            raise ValueError("Data high and low must be single byte values")
+        ack_flag = _DFPLAYER_ACK if ack else _DFPLAYER_NO_ACK
+        fcs_high, fcs_low = self._calculate_checksum(command, data_high, data_low, ack)
+        frame = [_DFPLAYER_START, _DFPLAYER_VERSION, _DFPLAYER_LEN, command, ack_flag, data_high, data_low, fcs_high, fcs_low, _DFPLAYER_END]        
         frame = bytes([b & 0xFF for b in frame]) # Convert to unsigned bytes
         self.uart.write(bytes(frame))
-        
-        # TODO extract into a method
-        # Give device some time to process the command
-        if command == DFPLAYER_CMD_SET_SOURCE: # set_media
-            sleep_ms(200) # According to the datasheet, this command takes 200ms
-        elif command == DFPLAYER_CMD_RESET: # reset
-            print("Sleeping for", DFPLAYER_BOOTUP_TIME_MS)
-            sleep_ms(DFPLAYER_BOOTUP_TIME_MS)
-        elif command in [0x47,0x48,0x49,0x4E]:     # query files
-            sleep_ms(500)
-        else:
-            print("Sleeping for", DFPLAYER_SEND_DELAY_MS)
-            sleep_ms(DFPLAYER_SEND_DELAY_MS) # other commands
-        
-        response_code, response_data = self._read_data()
+        self.uart.flush() # Wait until all data is sent        
 
-        if response_code == DFPLAYER_RESPONSE_OK:
-            print(f"Command {hex(command)} executed successfully {hex(response_code)}, {hex(response_data)}")
-            return True
+    def _handle_error_response(self, response_data):
+        if response_data == _DFPLAYER_ERROR_NO_SUCH_FILE:
+            raise RuntimeError("No such file or folder")
+        if response_data == _DFPLAYER_ERROR_BUSY:
+            raise RuntimeError("DFPlayer is busy")
+        if response_data == _DFPLAYER_ERROR_FRAME:
+            raise RuntimeError("DFPlayer received incomplete frame")
+        if response_data == _DFPLAYER_ERROR_FCS:
+            raise RuntimeError("DFPlayer received corrupted frame (FCS mismatch)")
+        if response_data == _DFPLAYER_ERROR_OUT_OF_RANGE:
+            raise RuntimeError("Requested track or folder is out of range")
+        if response_data == _DFPLAYER_ERROR_SD_READ:
+            raise RuntimeError("SD-card reading failed (SD-card pulled out or damaged)")
+        if response_data == _DFPLAYER_ERROR_SLEEP_MODE:
+            raise RuntimeError("Error while entering sleep mode")
+        if response_data == _DFPLAYER_ERROR_SLEEPING:
+            raise RuntimeError("Module is in sleep mode")
+        if response_data == _DFPLAYER_ERROR_INSERTION_CMD:
+            raise RuntimeError("Insertion operation can only be done when a track is being played")
+        raise RuntimeError(f"Unknown error. Data: {hex(response_data)}")          
+
+    def _exec_command(self, command, data_high = 0x0, data_low = 0x0, ack = True, is_query = False, check_error = False):
+        """
+        Execute a command on the DFPlayer module.
+
+        Parameters:
+            command (int): The command byte to send.
+            data_high (int): The high byte of the command data (default: 0x00).
+            data_low (int): The low byte of the command data (default: 0x00).
+            ack (bool): Whether to wait for an ACK response from the DFPlayer (default: True).
+            is_query (bool): Whether the command is a query that expects a response containing data (default: False).
+            check_error (bool): Whether to check for an error response after executing the command (default: False). 
+                If True, the function will wait for an error response and raise an exception if an error is received.
+        """
+        # There shouldn't be any pending frames when sending a new command
+        # however, if a response was received after the previous command timed out, it might be still in the buffer
+        self._frame_reader.update()
+        self._frame_reader.clear()
+
+        self._send_command(command, data_high, data_low, ack)
+        cmd_response = None
         
-        elif response_code == DFPLAYER_RESPONSE_ERROR:
-            if response_data == DFPLAYER_ERROR_BUSY:
-                raise RuntimeError("DFPlayer is busy")
-            if response_data == DFPLAYER_ERROR_FRAME:
-                raise RuntimeError("DFPlayer received incomplete frame")
-            if response_data == DFPLAYER_ERROR_FCS:
-                raise RuntimeError("DFPlayer received corrupted frame (FCS mismatch)")
-            if response_data == DFPLAYER_ERROR_NO_SUCH_FILE:
-                raise RuntimeError("No such file or folder")
-            raise RuntimeError("Unknown error")          
+        # For queries it seems that first the query response is sent, then the ACK/ERROR response.
+        if is_query:
+            self._frame_reader.update(await_frames=1)
+            # print(f"Amount of frames available (query): {self._frame_reader.available_frames()}")
+            cmd_response = self._frame_reader.pop_frame()
+            if cmd_response is None:
+                # No response received for query
+                return None
+
+            if cmd_response.command != command:
+                raise RuntimeError(f"Invalid response code. Expected: {hex(command)}, received: {hex(cmd_response.command)}, data: {hex(cmd_response.data)}")
+
+        if ack:
+            self._frame_reader.update(await_frames=1)
+            # print(f"Amount of frames available (ack): {self._frame_reader.available_frames()}")
+            ack_response = self._frame_reader.pop_frame()
+            if not ack_response:
+                raise RuntimeError(f"Command {hex(command)} was not acknowledged.")
+            elif not ack_response.is_ack:
+                raise RuntimeError(f"Received non-ack message for command {hex(command)}. Code: {hex(ack_response.command)} data: {hex(ack_response.data)}")
+
+        if not check_error:
+            return cmd_response
+
+        # The following handles errors for execution commands such as play_track
+        # Error response should be received within a short time
+        # Increase the timeout to ~1000ms to account for edge cases
+        # e.g. when executing play_track(1,123) while inserting an SD card
+        # and the track does not exist, it takes roughly 1s to respond with the error.
+        self._frame_reader.update(await_frames=1, timeout_ms=200)
+        error_response = self._frame_reader.pop_frame()
         
+        if error_response and error_response.is_error:
+            self._handle_error_response(error_response.data)
+
+        return cmd_response
+
+    def on_playback_status_change(self, callback):
+        """
+        Register a callback to be called when the playback status changes (play, pause, stop).
+        Requires the busy pin to be connected since the DFPlayer does not send notifications for playback status changes.
+        """
+        if not self.busy_pin:
+            raise RuntimeError("Busy pin must be connected to use playback status change notifications")
+        self._on_playback_status_change = callback
+
+    def on_track_finished(self, callback):
+        """Register a callback to be called when a track finishes playing."""
+        self._on_track_finished = callback
+
+    def on_media_inserted(self, callback):
+        """Register a callback to be called when media is inserted."""
+        self._on_media_inserted = callback
+
+    def on_media_ejected(self, callback):
+        """Register a callback to be called when media is ejected."""
+        self._on_media_ejected = callback
+
+    def on_device_ready(self, callback):
+        """Register a callback to be called when the device is ready after initialization."""
+        self._on_device_ready = callback
+
+    def update(self):
+        """Update the internal frame reader to process incoming frames."""
+        self._frame_reader.update()
+
     def reset(self):
         """Reset the DFPlayer."""
-        self._send_command(DFPLAYER_CMD_RESET)
-
+        self._exec_command(_DFPLAYER_CMD_RESET)
+        sleep_ms(_DFPLAYER_BOOTUP_TIME_MS)
+        # Reset command seems to generate spurious data in the UART buffer
+        spurious_data = self.uart.any() % _DFPLAYER_FRAME_SIZE
+        if spurious_data > 0:
+            # print(f"Clearing {spurious_data} bytes of spurious data from UART buffer after reset")
+            self.uart.read(spurious_data)
+        
     def next_track(self):
-        self._send_command(DFPLAYER_CMD_NEXT)
+        self._exec_command(_DFPLAYER_CMD_NEXT)
     
     def previous_track(self):
-        self._send_command(DFPLAYER_CMD_PREV)
+        self._exec_command(_DFPLAYER_CMD_PREV)
 
     def play(self):
-        self._send_command(DFPLAYER_CMD_PLAY)
+        self._exec_command(_DFPLAYER_CMD_PLAY)
 
     def pause(self):
-        self._send_command(DFPLAYER_CMD_PAUSE)
+        self._exec_command(_DFPLAYER_CMD_PAUSE)
 
     def stop(self):
-        self._send_command(0x16)
+        self._exec_command(_DFPLAYER_CMD_STOP)
 
     def set_muted(self, muted : bool):
         """Mute or unmute the DFPlayer."""
         value = 0x01 if muted else 0x00
-        self._send_command(0x1a, 0x00, value)
-
-    @property
-    def equalizer_mode(self):
-        """Return the current equalizer setting."""
-        self._send_command(DFPLAYER_CMD_GET_EQUALIZER)
-        response_code, response_data = self._read_data()
-        if response_code != DFPLAYER_CMD_GET_EQUALIZER:
-            raise RuntimeError(f"Invalid response code received {response_code}")
-        return response_data
-    
-    @equalizer_mode.setter
-    def equalizer_mode(self, value: EqualizerMode):
-        """Set the equalizer mode."""
-        if value < 0 or value > 5:
-            raise ValueError("Equalizer mode must be between 0 and 5")
-        self._send_command(DFPLAYER_CMD_SET_EQUALIZER, 0x00, value)
+        self._exec_command(_DFPLAYER_CMD_MUTE, 0x00, value)
 
     def increase_volume(self):
-        self._send_command(DFPLAYER_CMD_VOLUME_INC)
+        self._exec_command(_DFPLAYER_CMD_VOLUME_INC)
 
     def decrease_volume(self):
-        self._send_command(DFPLAYER_CMD_VOLUME_DEC)
+        self._exec_command(_DFPLAYER_CMD_VOLUME_DEC)
     
-    @property
-    def volume(self):
-        self._send_command(DFPLAYER_CMD_GET_VOLUME)
-        response_code, response_data = self._read_data()
-        if response_code != DFPLAYER_CMD_GET_VOLUME:
-            raise RuntimeError(f"Invalid response code received {response_code}")
-        return int(response_data / DFPLAYER_MAX_VOLUME * 100)
-
-    @volume.setter
-    def volume(self, value : int):
-        """Set the volume of the DFPlayer in percent (0-100%)."""
-        if value < 0 or value > 100:
-            raise ValueError("Volume must be between 0 and 100")        
-        value = int(value / 100 * DFPLAYER_MAX_VOLUME) # Map to range 0 - 30
-        self._send_command(DFPLAYER_CMD_SET_VOLUME, 0x00, value)
-
-    def play_from_mp3_folder(self, track_number):
-        """Play the given track number from the "MP3" folder."""
-        if track_number < 0 or track_number > DFPLAYER_MAX_MP3_FILE:
-            raise ValueError("Track number must be between 0 and 9999")
-        self._send_command(DFPLAYER_CMD_PLAY_FROM_MP3, track_number & 0xFF, track_number >> 8)
-
     def play_track(self, folder, track):
-        """Play the given track number from the given folder."""
-        if folder < 0 or folder > DFPLAYER_MAX_FOLDER:
-            raise ValueError("Folder number must be between 0 and 99")
-        if track < 0 or track > DFPLAYER_MAX_MP3_FILE:
-            raise ValueError("Track number must be between 0 and 9999")
-        self._send_command(DFPLAYER_CMD_FILE, folder, track)
+        """
+        Play the given track number from the given folder.
+        The format should be e.g. 02/123-Track.mp3, 
+        where 02 is the folder number and 123 is the track number.
+        If the tracks' name doesn't begin with such number, an error is thrown.
+        Upon completion of the track, the playback will stop.
+        """
+        if folder < 1 or folder > _DFPLAYER_MAX_FOLDER:
+            raise ValueError("Folder number must be between 1 and 99")
+        if track < 1 or track > _DFPLAYER_MAX_FILE:
+            raise ValueError("Track number must be between 1 and 255")
+        self._exec_command(_DFPLAYER_CMD_PLAY_FILE, folder, track, check_error=True)
 
     def play_track_by_number(self, track_number):
-        """Play the given track number from the current folder 0-2999"""
-        if track_number < 0 or track_number > 2999:
-            raise ValueError("Track number must be between 0 and 2999")            
-        self._send_command(0x03, 0x00, track_number)
-
-    def set_playback_mode(self, mode: PlaybackMode):
         """
-        Set the playback mode (0 - 3). 
-        0 = repeat, 1 = folder repeat, 2 = single repeat, 3 = random.
+        Play the given track number from the flattened file list.
+        The order of tracks is determined by the underlying file table.
+        TODO: Find out if all files are named e.g. 001-Track.mp3 if that 
+        determines the order instead.
         """
-        if mode < 0 or mode > 1:
-            raise ValueError("Playback mode must be 0 or 1")
-        self._send_command(DFPLAYER_CMD_SET_PLAYBACK_MODE, 0x00, mode)
+        if track_number < 1 or track_number > 65535:
+            raise ValueError("Track number must be between 1 and 65535")
+        self._exec_command(_DFPLAYER_CMD_PLAY_TRACK, track_number >> 8, track_number & 0xFF, check_error=True)
 
-    def set_playback_source(self, source : PlaybackSource):
+    def play_from_mp3_folder(self, track_number):
+        """
+        Play the given track number (0001-65535) from the "MP3" folder.
+        The formate should be e.g. MP3/0001-Track.mp3, where 0001 is the track number.
+        """
+        if track_number < 0 or track_number > _DFPLAYER_MAX_MP3_FILE:
+            raise ValueError("Track number must be between 0 and 9999")
+        self._exec_command(_DFPLAYER_CMD_PLAY_FROM_MP3, track_number >> 8, track_number & 0xFF, check_error=True)
+
+    def play_from_advert_folder(self, track_number):
+        """
+        Play the given track number from the "ADVERT" folder.
+        On DFRobot's DFPlayer: Raises _DFPLAYER_ERROR_INSERTION_CMD if playback is not active.
+        On MH2024K/GD3200: Resumes playback afterwards no matter if playback was active or not.
+        """
+        if track_number < 1 or track_number > _DFPLAYER_MAX_ADVERT_FILE:
+            raise ValueError("Track number must be between 1 and 9999")
+        self._exec_command(_DFPLAYER_CMD_PLAY_ADVERT, track_number >> 8, track_number & 0xFF, check_error=True)
+
+    def play_from_custom_advert_folder(self, folder: int, track: int):
+        """
+        Play a track from the custom advert folder (1-9).
+        The advert folder is a special folder that can be used to store short audio clips.
+        The structure should be e.g. ADVERT2/001-Beep.mp3. 
+        The arguments would be folder=2, track=1 in that case.
+        On DFRobot's DFPlayer: Raises _DFPLAYER_ERROR_INSERTION_CMD if playback is not active.
+        On MH2024K/GD3200: Resumes playback afterwards no matter if playback was active or not.
+        """
+        if folder < 1 or folder > 9:
+            raise ValueError("Advert folder number must be between 1 and 9")
+        if track < 1 or track > 255:
+            raise ValueError("Track number must be between 1 and 255")
+        self._exec_command(_DFPLAYER_CMD_ADVERT_FOLDER, folder, track, check_error=True)
+
+    def play_random(self):
+        """
+        Start playing all tracks from the current source in random order.
+        On DFRobot's DFPlayer, it starts always with the same track but subsequent tracks are random. 
+        On MH2024K/GD3200, it seems to be completely random including the first track.
+        """
+        self._exec_command(_DFPLAYER_CMD_RANDOM)
+
+    def play_track_large(self, folder: int, file: int):
+        """
+        Play the given file (1-4095) in the given folder (1-15).
+        This is for use cases where the file number exceeds 255 and cannot 
+        be specified with the regular play_file command.
+        The format should be e.g. 02/0001-Track.mp3, where 
+        02 is the folder number and 0001 is the track number.
+
+        Parameters:
+            folder (int): The folder number (1-15)
+            file (int): The file number (1-4095)
+        """
+        if folder < 1 or folder > 15:
+            raise ValueError("Folder number must be between 1 and 15")
+        if file < 1 or file > 4095:
+            raise ValueError("File number must be between 1 and 4095")
+        
+        # The high 4 bytes represent the folder name
+        # The low 12 bytes represent the file name
+        data = ((folder & 0x0F) << 12) | (file & 0x0FFF)
+        self._exec_command(_DFPLAYER_CMD_FILE_LARGE, (data >> 8) & 0xFF, data & 0xFF, check_error=True)
+
+    def abort_advert(self):
+        """Abort advert playback and resume current playback."""
+        self._exec_command(_DFPLAYER_CMD_ABORT_ADVERT)
+
+    def loop_track(self, track_id):
+        """
+        Loop the given track ID (0-65535) indefinitely. Starts playback.
+        The index is the file number from the flattened file list sorted chronologically.
+        It's the same as play_track_by_number but enables single track loop mode.
+        """
+        self._exec_command(_DFPLAYER_CMD_SINGLE_TRACK_LOOP, track_id >> 8, track_id & 0xFF, check_error=True)
+
+    def repeat_all(self, repeat: bool = True):
+        """
+        Starts repeat playback of all files from the flattened file list in chronological order.
+        If repeat is False, stops repeat playback and stops playback.
+
+        Parameters:
+            repeat (bool): True (default) to enable repeat all, False to disable.
+        """
+        value = 0x01 if repeat else 0x00
+        self._exec_command(_DFPLAYER_CMD_REPEAT_ALL, 0x00, value)
+
+    def repeat_folder(self, folder: int):
+        """
+        Start repeat-playing the given folder (1-99)        
+        Tracks are played in the order they were added to the file table.
+        The format should be e.g. 01/001-Track.mp3, where 
+        01 is the folder number and 001 is the track number.
+        """
+        if folder < 1 or folder > _DFPLAYER_MAX_FOLDER:
+            raise ValueError("Folder number must be between 1 and 99")
+        self._exec_command(_DFPLAYER_CMD_REPEAT_FOLDER, 0x0, folder)
+
+    def enter_standby(self):
+        """Enter standby mode."""
+        self._exec_command(_DFPLAYER_CMD_STANDBY_ENTER)
+
+    def set_playback_source(self, source : int):
         """
         Set the playback source.
-        0 = U-disk, 1 = SD card, 2 = AUX, 3 = SLEEP, 4 = FLASH
+        USB disk, SD card, AUX, SLEEP, FLASH (not all variants support all sources).
+        Parameters:
+            source (int): Source identifier as per DFPlayer documentation (depending on variant).            
         """
-        if source < 0 or source > 4:
-            raise ValueError("Playback source must be between 0 and 4")
-        self._send_command(DFPLAYER_CMD_SET_SOURCE, 0x00, source)
-
-    def set_standby(self, enabled : bool):
-        """Enter or exit standby mode."""
-        if enabled:
-            self._send_command(DFPLAYER_CMD_STANDBY_ENTER)
-        else:
-            self._send_command(DFPLAYER_CMD_STANDBY_EXIT)
+        # According to the datasheet, this command takes 200ms
+        self._exec_command(_DFPLAYER_CMD_SET_SOURCE, 0x00, source)
 
     @property
-    def status(self) -> PlayerStatus:
+    def status(self) -> PlayerStatus | None:
         """
         Return the current status of the DFPlayer.
         The possible return values are:
@@ -330,27 +660,142 @@ class DFPlayer:
         - PlayerStatus.PLAYING
         - PlayerStatus.PAUSED
         """
-        self._send_command(DFPLAYER_CMD_GET_STATUS)
-        response_code, response_data = self._read_data()
-        if response_code != DFPLAYER_CMD_GET_STATUS:
-            raise RuntimeError(f"Invalid response code received {response_code}")
+        response = self._exec_command(_DFPLAYER_CMD_GET_STATUS, is_query=True)
+        if response is None:
+            return None
         
-        if response_data == DFPLAYER_STATUS_STOPPED:
+        # MSB contains the source of the playback (USB/SD/Sleep), not available on all versions
+        response_data = response.data & _DFPLAYER_STATUS_MASK
+        
+        if response_data == _DFPLAYER_STATUS_STOPPED:
             return PlayerStatus.STOPPED
-        if response_data == DFPLAYER_STATUS_PLAYING:
+        if response_data == _DFPLAYER_STATUS_PLAYING:
             return PlayerStatus.PLAYING
-        if response_data == DFPLAYER_STATUS_PAUSED:
+        if response_data == _DFPLAYER_STATUS_PAUSED:
             return PlayerStatus.PAUSED
         
-        return None
+        raise RuntimeError(f"Unknown status code received: {hex(response_data)}")
 
-if __name__ == "__main__":
-    from machine import UART
-    uart = UART(0, tx=Pin("TX"), rx=Pin("RX"))
-    player = DFPlayer(uart)
-    #busy_pin = Pin("D4")
-    #player = DFPlayer(uart, busy_pin)
-    #print(player.status)
-    player.volume = 20
-    #player.play() # Play the current / first track
-    #player.play_track(2, 1) # Play track 1 from folder 2
+    @property
+    def playing(self):
+        """Return True if the DFPlayer is currently playing a song."""
+        if self.busy_pin: # If we have a busy pin, use it
+            return self._playing
+        return self.status == PlayerStatus.PLAYING
+    
+    @property
+    def volume(self) -> int | None:
+        response = self._exec_command(_DFPLAYER_CMD_GET_VOLUME, is_query=True)
+        return int(response.data / _DFPLAYER_MAX_VOLUME * 100) if response else None
+
+    @volume.setter
+    def volume(self, value : int):
+        """Set the volume of the DFPlayer in percent (0-100%)."""
+        if value < 0 or value > 100:
+            raise ValueError("Volume must be between 0 and 100")        
+        value = int(value / 100 * _DFPLAYER_MAX_VOLUME) # Map to range 0 - 30
+        self._exec_command(_DFPLAYER_CMD_SET_VOLUME, 0x00, value)
+
+    @property
+    def equalizer_mode(self):
+        """Return the current equalizer setting."""
+        response_data = self._exec_command(_DFPLAYER_CMD_GET_EQUALIZER, is_query=True).data
+        if response_data == 0:
+            return EqualizerMode.NORMAL
+        if response_data == 1:
+            return EqualizerMode.POP
+        if response_data == 2:
+            return EqualizerMode.ROCK
+        if response_data == 3:
+            return EqualizerMode.JAZZ
+        if response_data == 4:
+            return EqualizerMode.CLASSIC
+        if response_data == 5:
+            return EqualizerMode.BASS
+        return None
+    
+    @equalizer_mode.setter
+    def equalizer_mode(self, value: EqualizerMode):
+        """Set the equalizer mode."""
+        if value < 0 or value > 5:
+            raise ValueError("Equalizer mode must be between 0 and 5")
+        self._exec_command(_DFPLAYER_CMD_SET_EQUALIZER, 0x00, value)
+
+    @property
+    def software_version(self) -> int | None:
+        """Return the DFPlayer software version as a number."""
+        response = self._exec_command(_DFPLAYER_CMD_GET_VERSION, is_query=True)
+        return response.data if response else None
+    
+    @property
+    def playback_mode(self) -> int | None:
+        """
+        Return the current playback mode:
+        Full cycle | Single cycle | Folder loop | 
+        Random loop | Play the single once | Single seamless loop
+        The meaning of the return values is device-dependent.
+        """
+        response = self._exec_command(_DFPLAYER_CMD_GET_PLAYBACK_MODE, is_query=True)
+        return response.data if response else None
+    
+    @property
+    def file_count_flash(self) -> int | None:
+        """Return the total number of files on the internal flash storage."""
+        response = self._exec_command(_DFPLAYER_CMD_FILES_FLASH, is_query=True)
+        return response.data if response else None
+    
+    @property
+    def file_count_usb(self) -> int | None:
+        """Return the number of files on the USB storage."""
+        response = self._exec_command(_DFPLAYER_CMD_FILES_USB, is_query=True)
+        return response.data if response else None
+    
+    @property
+    def file_count_sdcard(self) -> int | None:
+        """Return the number of files on the SD card."""
+        response = self._exec_command(_DFPLAYER_CMD_FILES_SDCARD, is_query=True)
+        return response.data if response else None    
+    
+    def file_count_in_folder(self, folder: int) -> int | None:
+        """Return the number of files in the given folder."""
+        # Don't ask for an ACK message, since on DFROBOT|LISP3 the device responds 
+        # with an ACK message first followed by the query response
+        # wich is in reverse order compared to other queries. 
+        # This is a workaround to avoid having to handle this special case in the main query handling code.
+        # TODO: Check if we can handle this better by improving the query handling code
+        # TODO: Error handling is not working for this command, since also the error response gets sent before the query response.
+        response = self._exec_command(_DFPLAYER_CMD_FILES_IN_FOLDER, 0x00, folder, is_query=True, ack=False, check_error=True)
+        return response.data if response else None
+
+    @property
+    def folder_count(self) -> int | None:
+        """Return the number of folders on the current storage device."""
+        # Don't ask for an ACK message, since on DFROBOT|LISP3 the device responds 
+        # with an ACK message first followed by the query response
+        # wich is in reverse order compared to other queries. 
+        # This is a workaround to avoid having to handle this special case in the main query handling code.
+        # TODO: Check if we can handle this better by improving the query handling code
+        response = self._exec_command(_DFPLAYER_CMD_FOLDERS, is_query=True, ack=False)
+        return response.data if response else None
+
+    @property
+    def current_file_number_sdcard(self) -> int | None:
+        """
+        Return the currently selected file number on the SD card.
+        This number is the same as the track number used in play_track_by_number().
+        """
+        response = self._exec_command(_DFPLAYER_CMD_FILENO_SDCARD, is_query=True)
+        return response.data if response else None
+    
+    @property
+    def current_file_number_usb(self) -> int | None:
+        """Return the currently selected file number on the USB storage."""
+        response = self._exec_command(_DFPLAYER_CMD_FILENO_USB, is_query=True)
+        return response.data if response else None
+    
+    @property
+    def current_file_number_flash(self) -> int | None:
+        """Return the currently selected file number on the internal flash storage."""
+        response = self._exec_command(_DFPLAYER_CMD_FILENO_FLASH, is_query=True)
+        return response.data if response else None
+    

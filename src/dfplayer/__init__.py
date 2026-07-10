@@ -4,4 +4,7 @@ __license__ = "MPL 2.0"
 __maintainer__ = "Sebastian Romero"
 
 # Import core classes and/or functions to expose them at the package level
-from .dfplayer import DFPlayer
+from .dfplayer import DFPlayer, EqualizerMode, PlayerStatus
+from .dfrobot import DFRobotPlayer
+from .mh2024k import MH2024KPlayer
+from .random_folder_player import RandomFolderPlayer
