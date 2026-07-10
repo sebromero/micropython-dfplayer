@@ -1,7 +1,10 @@
 {
   "urls": [
       ["dfplayer/__init__.py", "github:sebromero/micropython-dfplayer/src/dfplayer/__init__.py"],
-      ["dfplayer/dfplayer.py", "github:sebromero/micropython-dfplayer/src/dfplayer/dfplayer.py"]
-    ],    
-    "version": "1.0.0"
+      ["dfplayer/dfplayer.py", "github:sebromero/micropython-dfplayer/src/dfplayer/dfplayer.py"],
+      ["dfplayer/dfrobot.py", "github:sebromero/micropython-dfplayer/src/dfplayer/dfrobot.py"],
+      ["dfplayer/mh2024k.py", "github:sebromero/micropython-dfplayer/src/dfplayer/mh2024k.py"],
+      ["dfplayer/random_folder_player.py", "github:sebromero/micropython-dfplayer/src/dfplayer/random_folder_player.py"]
+    ],
+    "version": "1.1.0"
 }
