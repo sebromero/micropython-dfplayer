@@ -9,6 +9,7 @@ from collections import deque
 # CONFIG
 _DFPLAYER_BOOTUP_TIME_MS = const(3000)  # Boot up of the device takes 1.5 to 3 secs.
 _DFPLAYER_TIMEOUT_UART_MS = const(100)  # Default timeout waiting for UART data in milliseconds.
+_DFPLAYER_TIMEOUT_FILE_COUNT_MS = const(3000)  # Timeout waiting for file count response in milliseconds.
 
 _DFPLAYER_MAX_VOLUME = const(30)  # Maximum supported volume.
 _DFPLAYER_MAX_FOLDER = const(99)  # Highest supported folder number.
@@ -245,7 +246,7 @@ class FrameReader():
 
         while True:
             # Check for timeout
-            if timeout_ms is not None and (ticks_ms() - start_time) >= timeout_ms:
+            if timeout_ms is not None and ticks_diff(ticks_ms(), start_time) >= timeout_ms:
                 return frames_added
                         
             f = self._read_frame()
@@ -391,7 +392,7 @@ class DFPlayer:
             raise RuntimeError("Insertion operation can only be done when a track is being played")
         raise RuntimeError(f"Unknown error. Data: {hex(response_data)}")          
 
-    def _exec_command(self, command, data_high = 0x0, data_low = 0x0, ack = True, is_query = False, check_error = False):
+    def _exec_command(self, command, data_high = 0x0, data_low = 0x0, ack = True, is_query = False, check_error = False, query_timeout_ms = 1000):
         """
         Execute a command on the DFPlayer module.
 
@@ -414,7 +415,7 @@ class DFPlayer:
         
         # For queries it seems that first the query response is sent, then the ACK/ERROR response.
         if is_query:
-            self._frame_reader.update(await_frames=1)
+            self._frame_reader.update(await_frames=1, timeout_ms=query_timeout_ms)
             # print(f"Amount of frames available (query): {self._frame_reader.available_frames()}")
             cmd_response = self._frame_reader.pop_frame()
             if cmd_response is None:
@@ -756,15 +757,21 @@ class DFPlayer:
         response = self._exec_command(_DFPLAYER_CMD_FILES_SDCARD, is_query=True)
         return response.data if response else None    
     
-    def file_count_in_folder(self, folder: int) -> int | None:
-        """Return the number of files in the given folder."""
+    def file_count_in_folder(self, folder: int, timeout_ms: int = _DFPLAYER_TIMEOUT_FILE_COUNT_MS) -> int | None:
+        """
+        Return the number of files in the given folder.
+        
+        Parameters:
+            folder (int): The folder number (1-99)
+            timeout_ms (int): The maximum time to wait for a response in milliseconds. Default is _DFPLAYER_TIMEOUT_FILE_COUNT_MS.
+        """
         # Don't ask for an ACK message, since on DFROBOT|LISP3 the device responds 
         # with an ACK message first followed by the query response
         # wich is in reverse order compared to other queries. 
         # This is a workaround to avoid having to handle this special case in the main query handling code.
         # TODO: Check if we can handle this better by improving the query handling code
         # TODO: Error handling is not working for this command, since also the error response gets sent before the query response.
-        response = self._exec_command(_DFPLAYER_CMD_FILES_IN_FOLDER, 0x00, folder, is_query=True, ack=False, check_error=True)
+        response = self._exec_command(_DFPLAYER_CMD_FILES_IN_FOLDER, 0x00, folder, is_query=True, ack=False, check_error=True, query_timeout_ms=timeout_ms)
         return response.data if response else None
 
     @property
