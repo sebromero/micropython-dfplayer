@@ -697,7 +697,7 @@ class DFPlayer:
         self._exec_command(_DFPLAYER_CMD_SET_VOLUME, 0x00, value)
 
     @property
-    def equalizer_mode(self):
+    def equalizer_mode(self) -> int | None:
         """Return the current equalizer setting."""
         response_data = self._exec_command(_DFPLAYER_CMD_GET_EQUALIZER, is_query=True).data
         if response_data == 0:
@@ -715,7 +715,7 @@ class DFPlayer:
         return None
     
     @equalizer_mode.setter
-    def equalizer_mode(self, value: EqualizerMode):
+    def equalizer_mode(self, value: int):
         """Set the equalizer mode."""
         if value < 0 or value > 5:
             raise ValueError("Equalizer mode must be between 0 and 5")
