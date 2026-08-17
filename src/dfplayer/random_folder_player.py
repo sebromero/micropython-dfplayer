@@ -11,6 +11,15 @@ class RandomFolderPlayer:
     in the shuffled playlist until all tracks have been played.
     """
     def __init__(self, player: DFPlayer, delay_ms: int = None, timer_id: int = 1):
+        """
+        Initialize the RandomFolderPlayer.
+
+        Parameters:
+            player: An instance of the DFPlayer class to control the audio playback.
+            delay_ms: Optional delay in milliseconds before playing the next track after one finishes.
+            timer_id: Optional ID for the hardware timer to use for delays. If None, no hardware timer is used, 
+                        and the update() method must be called regularly to handle delays.                        
+        """
         self.player = player
         self.current_folder = None
         self.large_folder = False
@@ -27,6 +36,8 @@ class RandomFolderPlayer:
         self.player.on_track_finished(self._on_track_finished)
 
     def _shuffle(self):
+        if self.playlist is None:
+            return
         # A basic Fisher-Yates shuffle is used
         for i in range(len(self.playlist) - 1, 0, -1):
             j = random.randrange(0, i + 1)
