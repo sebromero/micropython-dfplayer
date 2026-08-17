@@ -102,9 +102,12 @@ class RandomFolderPlayer:
             print(f"Error playing track {track} from folder {self.current_folder}: {e}")
 
     def _on_track_finished(self, track_id):
+        if self.playlist is None:
+            # No playlist selected. Ignoring 'track finished' event"
+            return
+
         # A track is done, play the next one
-        if self.playlist is not None:
-            print(f"Track with ID {track_id} finished.")
+        print(f"Track with ID {track_id} finished.")
         
         if self.playlist is not None and self.playlist_empty:
             print("All tracks in the folder have been played.")
